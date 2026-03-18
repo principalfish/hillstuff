@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Big Runs{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Big Runs</h1>
+    <a href="{{ url_for('walks.route_new') }}" class="btn btn-primary">+ New Route</a>
+</div>
+
+{% if routes %}
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Legs</th>
+            <th>Distance (km)</th>
+            <th>Ascent (m)</th>
+            <th>Descent (m)</th>
+            <th>Created</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in routes %}
+        <tr>
+            <td><a href="{{ url_for('walks.route_detail', route_id=r.id) }}">{{ r.name }}</a></td>
+            <td>{{ r.leg_count }}</td>
+            <td>{{ '%.1f' | format(r.total_distance) }}</td>
+            <td>{{ '%.0f' | format(r.total_ascent) }}</td>
+            <td>{{ '%.0f' | format(r.total_descent) }}</td>
+            <td>{{ r.created_at[:10] if r.created_at else '' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No routes yet. <a href="{{ url_for('walks.route_new') }}">Create one</a>.</p>
+{% endif %}
+{% endblock %}

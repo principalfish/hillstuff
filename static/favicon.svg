@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Sky background -->
+  <rect width="64" height="64" rx="8" fill="#4a90d9"/>
+  <!-- Back mountain -->
+  <polygon points="8,52 28,18 48,52" fill="#5a7a3a"/>
+  <!-- Front mountain -->
+  <polygon points="20,52 42,12 62,52" fill="#2d5016"/>
+  <!-- Snow cap -->
+  <polygon points="42,12 36,24 42,22 48,24" fill="#fff"/>
+  <!-- Figure on summit -->
+  <!-- Head -->
+  <circle cx="42" cy="8" r="2.5" fill="#1a1a1a"/>
+  <!-- Body -->
+  <line x1="42" y1="10.5" x2="42" y2="17" stroke="#1a1a1a" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- Arms raised in triumph -->
+  <line x1="42" y1="12.5" x2="39" y2="10" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="42" y1="12.5" x2="45" y2="10" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Legs -->
+  <line x1="42" y1="17" x2="40" y2="21" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="42" y1="17" x2="44" y2="21" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Ground -->
+  <rect x="0" y="52" width="64" height="12" rx="0" fill="#3d6b1f"/>
+</svg>

@@ -1,0 +1,296 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    color: #1a1a1a;
+    background: #f5f5f5;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+nav {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 1rem 0;
+    border-bottom: 2px solid #2d5016;
+    margin-bottom: 1.5rem;
+}
+
+.nav-brand {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #2d5016;
+    text-decoration: none;
+}
+
+.nav-links { display: flex; gap: 1rem; }
+
+.nav-links a {
+    color: #2d5016;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.nav-links a:hover { text-decoration: underline; }
+
+h1 { margin-bottom: 1rem; color: #1a1a1a; }
+h2 { margin: 1.5rem 0 0.75rem; color: #333; }
+h3 { margin: 1rem 0 0.5rem; color: #555; }
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.header-actions { display: flex; gap: 0.5rem; }
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    color: #333;
+    text-decoration: none;
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.btn:hover { background: #f0f0f0; }
+
+.btn-primary {
+    background: #2d5016;
+    color: #fff;
+    border-color: #2d5016;
+}
+
+.btn-primary:hover { background: #3d6b1f; }
+
+.btn-danger {
+    background: #c0392b;
+    color: #fff;
+    border-color: #c0392b;
+}
+
+.btn-danger:hover { background: #e74c3c; }
+
+.btn-small { padding: 0.2rem 0.5rem; font-size: 0.75rem; }
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    margin: 0.5rem 0;
+}
+
+th, td {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #ddd;
+    text-align: left;
+    font-size: 0.875rem;
+}
+
+th {
+    background: #f8f8f8;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+tbody tr:hover { background: #f9f9f9; }
+
+.totals-row { background: #f0f0f0; font-weight: 600; }
+
+.overridden { background: #fef9e7; }
+
+/* Forms */
+.form-group {
+    margin-bottom: 0.75rem;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+textarea,
+select {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    width: 100%;
+}
+
+input[type="number"] { width: 6rem; }
+
+textarea { width: 100%; font-family: inherit; }
+
+.form-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.inline-form {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.override-input { width: 5rem !important; }
+
+.help-text { font-size: 0.8rem; color: #888; margin-bottom: 0.5rem; }
+
+/* Sections */
+.section { margin-bottom: 2rem; }
+
+.sections { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+.section-card {
+    display: block;
+    padding: 1.5rem;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+    width: 280px;
+}
+
+.section-card:hover { border-color: #2d5016; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.section-card h2 { margin: 0 0 0.5rem; color: #2d5016; }
+.section-card p { color: #666; font-size: 0.9rem; }
+
+/* Flash messages */
+.flashes { margin-bottom: 1rem; }
+
+.flash {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.flash-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+.flash-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+/* Diffs */
+.diff-positive { color: #c0392b; }
+.diff-negative { color: #27ae60; }
+
+/* CSV section */
+.csv-section, .manual-section {
+    background: #fff;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+/* Attempt controls */
+.attempt-controls {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.attempt-controls label { font-weight: 500; }
+.attempt-controls select { width: auto; }
+
+.add-attempt {
+    margin-top: 1rem;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 1rem;
+}
+
+.add-attempt summary { cursor: pointer; }
+
+.attempt-delete-section {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Pace table inputs */
+.pace-table input { width: 100%; }
+
+/* Settings form */
+.settings-form { margin-bottom: 1rem; }
+.settings-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.settings-row label { font-weight: 500; }
+.settings-row input[type="time"],
+.settings-row input[type="date"] { width: 10rem; }
+
+/* Solar info */
+.solar-info {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.solar-table { width: auto; margin: 0; }
+.solar-table th { background: none; font-size: 0.8rem; color: #666; }
+.solar-table td { font-weight: 600; }
+
+.solar-markers { margin-top: 0.5rem; font-size: 0.85rem; color: #555; }
+
+.solar-badge {
+    font-size: 0.75rem;
+    margin-left: 0.3rem;
+    vertical-align: middle;
+}
+
+.sunrise-badge { color: #e67e22; }
+.sunset-badge { color: #8e44ad; }
+
+.sunrise-leg { border-left: 3px solid #e67e22; }
+.sunset-leg { border-left: 3px solid #8e44ad; }
+
+/* Map picker */
+#map { height: 300px; border-radius: 4px; border: 1px solid #ddd; margin-bottom: 0.5rem; cursor: crosshair; }
+.latlng-fields { display: flex; gap: 1rem; margin-bottom: 0.5rem; }
+.latlng-fields label { font-weight: 500; }
+.latlng-fields input { width: 8rem; }
+
+/* Scrollable tables */
+.table-scroll { overflow-x: auto; }
+
+.notes-cell { max-width: 200px; font-size: 0.8rem; color: #555; }
+
+.notes-input { min-width: 10rem; }
+.notes-input-inline { min-width: 14rem; font-size: 0.8rem; }
+
+.stat-input { width: 4.5rem !important; }
+.stat-input-narrow { width: 4rem !important; }
+
+/* Comparison row shading */
+.row-faster { background-color: #e8f5e9; }
+.row-slower { background-color: #ffebee; }
+
+/* Responsive */
+@media (max-width: 768px) {
+    table { font-size: 0.75rem; }
+    th, td { padding: 0.3rem; }
+}

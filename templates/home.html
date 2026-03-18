@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Hills & Runs</h1>
+<div class="sections">
+    <a href="{{ url_for('walks.route_list') }}" class="section-card">
+        <h2>Big Runs</h2>
+        <p>Plan and analyze long-distance routes with pace tiers and attempt tracking.</p>
+    </a>
+</div>
+{% endblock %}

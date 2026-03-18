@@ -1,0 +1,11 @@
+repos:
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - flask
+          - flask-sqlalchemy
+          - pydantic
+          - sqlalchemy
+        args: [--config-file=mypy.ini]

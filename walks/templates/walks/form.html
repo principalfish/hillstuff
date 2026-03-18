@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if route else 'New' }} Route{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endblock %}
+
+{% block content %}
+<h1>{{ 'Edit' if route else 'New' }} Route</h1>
+
+<form method="POST" enctype="multipart/form-data">
+    <div class="form-group">
+        <label for="name">Route Name</label>
+        <input type="text" id="name" name="name" value="{{ route.name if route else '' }}" required>
+    </div>
+
+    <h2>Location</h2>
+    <p class="help-text">Click the map to set the start location (used for sunrise/sunset calculations).</p>
+    <div id="map"></div>
+    <div class="latlng-fields">
+        <label>Lat <input type="number" step="0.0001" id="latitude" name="latitude" value="{{ route.latitude if route else 56.8 }}"></label>
+        <label>Lon <input type="number" step="0.0001" id="longitude" name="longitude" value="{{ route.longitude if route else -5.1 }}"></label>
+    </div>
+
+    <h2>Legs</h2>
+    <p class="help-text">Each leg is a location (checkpoint). The first leg is the start point with distance/ascent/descent of 0.</p>
+
+    <div class="csv-section" id="csv-section">
+        <p class="help-text">Columns: leg_num, location, distance_km, ascent_m, descent_m (descent optional)</p>
+        <div class="form-group">
+            <label for="csv_file">Upload CSV file</label>
+            <input type="file" id="csv_file" name="csv_file" accept=".csv,.txt">
+        </div>
+        <div class="form-group">
+            <label for="csv_data">Or paste CSV data</label>
+            <textarea id="csv_data" name="csv_data" rows="10" placeholder="1,Start Town,0,0,0&#10;2,Checkpoint 1,12.5,350,120&#10;3,Checkpoint 2,8.3,120,200"></textarea>
+        </div>
+        <button type="button" class="btn btn-primary" onclick="importCsv()">Import</button>
+    </div>
+
+    <h3>Legs</h3>
+    <div class="manual-section" id="manual-section">
+        <table id="legs-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Location</th>
+                    <th>Distance (km)</th>
+                    <th>Ascent (m)</th>
+                    <th>Descent (m)</th>
+                    <th>Notes</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="legs-body">
+                {% for leg in legs %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><input type="text" name="leg_location_{{ loop.index0 }}" value="{{ leg.location }}"></td>
+                    <td><input type="number" step="0.1" name="leg_distance_{{ loop.index0 }}" value="{{ '%.1f' | format(leg.distance_km) }}"></td>
+                    <td><input type="number" step="1" name="leg_ascent_{{ loop.index0 }}" value="{{ '%.0f' | format(leg.ascent_m) }}"></td>
+                    <td><input type="number" step="1" name="leg_descent_{{ loop.index0 }}" value="{{ '%.0f' | format(leg.descent_m) }}"></td>
+                    <td><input type="text" name="leg_notes_{{ loop.index0 }}" value="{{ leg.notes or '' }}" class="notes-input"></td>
+                    <td><button type="button" class="btn btn-small btn-danger" onclick="removeLeg(this)">×</button></td>
+                </tr>
+                {% endfor %}
+                {% if not legs %}
+                <tr>
+                    <td>1</td>
+                    <td><input type="text" name="leg_location_0" placeholder="Start point"></td>
+                    <td><input type="number" step="0.1" name="leg_distance_0" value="0"></td>
+                    <td><input type="number" step="1" name="leg_ascent_0" value="0"></td>
+                    <td><input type="number" step="1" name="leg_descent_0" value="0"></td>
+                    <td><input type="text" name="leg_notes_0" class="notes-input"></td>
+                    <td><button type="button" class="btn btn-small btn-danger" onclick="removeLeg(this)">×</button></td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        <button type="button" class="btn" onclick="addLeg()">+ Add Leg</button>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Route</button>
+        <a href="{{ url_for('walks.route_list') }}" class="btn">Cancel</a>
+    </div>
+</form>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Map
+const initLat = {{ route.latitude if route else 56.8 }};
+const initLon = {{ route.longitude if route else -5.1 }};
+const map = L.map('map').setView([initLat, initLon], 10);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 18
+}).addTo(map);
+
+let marker = L.marker([initLat, initLon]).addTo(map);
+
+map.on('click', function(e) {
+    const lat = Math.round(e.latlng.lat * 10000) / 10000;
+    const lon = Math.round(e.latlng.lng * 10000) / 10000;
+    marker.setLatLng([lat, lon]);
+    document.getElementById('latitude').value = lat;
+    document.getElementById('longitude').value = lon;
+});
+
+// Sync text inputs back to marker
+document.getElementById('latitude').addEventListener('change', updateMarker);
+document.getElementById('longitude').addEventListener('change', updateMarker);
+function updateMarker() {
+    const lat = parseFloat(document.getElementById('latitude').value);
+    const lon = parseFloat(document.getElementById('longitude').value);
+    if (!isNaN(lat) && !isNaN(lon)) {
+        marker.setLatLng([lat, lon]);
+        map.setView([lat, lon]);
+    }
+}
+
+// CSV import
+function importCsv() {
+    const fileInput = document.getElementById('csv_file');
+    const textArea = document.getElementById('csv_data');
+
+    if (fileInput.files.length > 0) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            parseCsvIntoTable(e.target.result.trim());
+            fileInput.value = '';
+        };
+        reader.readAsText(fileInput.files[0]);
+    } else {
+        const text = textArea.value.trim();
+        if (!text) return;
+        parseCsvIntoTable(text);
+        textArea.value = '';
+    }
+}
+
+function parseCsvIntoTable(text) {
+    const rows = text.split('\n').map(r => r.split(',').map(c => c.trim()));
+    let start = 0;
+    if (rows[0] && rows[0][0].match(/[a-zA-Z#]/)) start = 1;
+
+    const tbody = document.getElementById('legs-body');
+    tbody.innerHTML = '';
+
+    for (let i = start; i < rows.length; i++) {
+        const r = rows[i];
+        if (r.length < 4) continue;
+        const idx = tbody.querySelectorAll('tr').length;
+        const dist = Math.round(parseFloat(r[2]) * 10) / 10;
+        const asc = Math.round(parseFloat(r[3]));
+        const desc = Math.round(parseFloat(r[4] || 0));
+        const notes = (r[5] || '').trim();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${idx + 1}</td>
+            <td><input type="text" name="leg_location_${idx}" value="${r[1]}"></td>
+            <td><input type="number" step="0.1" name="leg_distance_${idx}" value="${dist}"></td>
+            <td><input type="number" step="1" name="leg_ascent_${idx}" value="${asc}"></td>
+            <td><input type="number" step="1" name="leg_descent_${idx}" value="${desc}"></td>
+            <td><input type="text" name="leg_notes_${idx}" value="${notes}" class="notes-input"></td>
+            <td><button type="button" class="btn btn-small btn-danger" onclick="removeLeg(this)">×</button></td>
+        `;
+        tbody.appendChild(tr);
+    }
+}
+
+function addLeg() {
+    const tbody = document.getElementById('legs-body');
+    const rows = tbody.querySelectorAll('tr');
+    const idx = rows.length;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td><input type="text" name="leg_location_${idx}"></td>
+        <td><input type="number" step="0.1" name="leg_distance_${idx}"></td>
+        <td><input type="number" step="1" name="leg_ascent_${idx}"></td>
+        <td><input type="number" step="1" name="leg_descent_${idx}"></td>
+        <td><input type="text" name="leg_notes_${idx}" class="notes-input"></td>
+        <td><button type="button" class="btn btn-small btn-danger" onclick="removeLeg(this)">×</button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function removeLeg(btn) {
+    const tbody = document.getElementById('legs-body');
+    if (tbody.querySelectorAll('tr').length > 1) {
+        btn.closest('tr').remove();
+        renumberLegs();
+    }
+}
+
+function renumberLegs() {
+    const rows = document.querySelectorAll('#legs-body tr');
+    rows.forEach((row, i) => {
+        row.querySelector('td').textContent = i + 1;
+        row.querySelectorAll('input').forEach(input => {
+            input.name = input.name.replace(/_\d+$/, `_${i}`);
+        });
+    });
+}
+</script>
+{% endblock %}

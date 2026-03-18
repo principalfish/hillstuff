@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}{{ route.name }}{% endblock %}
+
+{% block head %}
+<style>
+{% set tier_colors = ['#e8f5e9', '#fff9c4', '#ffe0b2', '#ffccbc', '#f8bbd0', '#e1bee7'] %}
+{% for tier in pace_tiers %}
+.pace-tier-{{ loop.index0 }} { background-color: {{ tier_colors[loop.index0] if loop.index0 < tier_colors|length else tier_colors[-1] }} !important; }
+{% endfor %}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ route.name }}</h1>
+    <div class="header-actions">
+        <form method="POST" action="{{ url_for('walks.route_delete', route_id=route.id) }}"
+              onsubmit="return confirm('Delete this route?')" style="display:inline">
+            <button type="submit" class="btn btn-danger">Delete</button>
+        </form>
+    </div>
+</div>
+
+<!-- Start Time / Date / Solar -->
+<section class="section">
+    <h2>Time Settings</h2>
+    <form method="POST" action="{{ url_for('walks.save_settings', route_id=route.id) }}" class="settings-form">
+        <div class="settings-row">
+            <label>Start time <input type="time" name="start_time" value="{{ route.start_time or '' }}"></label>
+            <label>Start date <input type="date" name="start_date" value="{{ route.start_date or '' }}"></label>
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+    </form>
+
+    {% if solar %}
+    <div class="solar-info">
+        <table class="solar-table">
+            <tr>
+                <th>Sunrise</th>
+                <th>Solar Noon</th>
+                <th>Sunset</th>
+                <th>Daylight</th>
+                <th>Timezone</th>
+            </tr>
+            <tr>
+                <td>{{ solar.sunrise_str }}</td>
+                <td>{{ solar.solar_noon_str }}</td>
+                <td>{{ solar.sunset_str }}</td>
+                <td>{{ solar.daylight_str }}</td>
+                <td>{{ solar.timezone }}</td>
+            </tr>
+        </table>
+        {% if solar_events.sunrise_leg or solar_events.sunset_leg %}
+        <p class="solar-markers">
+            {% if solar_events.sunrise_leg %}
+                Sunrise during leg {{ solar_events.sunrise_leg }}
+            {% endif %}
+            {% if solar_events.sunrise_leg and solar_events.sunset_leg %} · {% endif %}
+            {% if solar_events.sunset_leg %}
+                Sunset during leg {{ solar_events.sunset_leg }}
+            {% endif %}
+        </p>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+
+<!-- Pace Tiers -->
+<section class="section">
+    <h2>Pace Tiers</h2>
+    <form method="POST" action="{{ url_for('walks.save_paces', route_id=route.id) }}">
+        <table class="pace-table">
+            <thead>
+                <tr>
+                    <th>Up to (minutes)</th>
+                    <th>Flat (min/km)</th>
+                    <th>Ascent (min/125m)</th>
+                    <th>Descent (min/375m)</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="pace-body">
+                {% for tier in pace_tiers %}
+                <tr>
+                    <td><input type="number" step="1" name="up_to_{{ loop.index0 }}" value="{{ tier.up_to_minutes|default('', true) }}" placeholder="∞"></td>
+                    <td><input type="number" step="0.1" name="flat_pace_{{ loop.index0 }}" value="{{ tier.flat_pace_min_per_km }}" required></td>
+                    <td><input type="number" step="0.1" name="ascent_pace_{{ loop.index0 }}" value="{{ tier.ascent_pace_min_per_125m }}" required></td>
+                    <td><input type="number" step="0.1" name="descent_pace_{{ loop.index0 }}" value="{{ tier.descent_pace_min_per_375m }}" required></td>
+                    <td><button type="button" class="btn btn-small btn-danger" onclick="removePaceTier(this)">×</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="form-actions">
+            <button type="button" class="btn" onclick="addPaceTier()">+ Add Tier</button>
+            <button type="submit" class="btn btn-primary">Save Paces</button>
+        </div>
+    </form>
+</section>
+
+<!-- Legs Table -->
+<section class="section">
+    <h2>Legs</h2>
+    <form method="POST" action="{{ url_for('walks.save_legs', route_id=route.id) }}">
+    <div class="table-scroll">
+    <table class="legs-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Location</th>
+                <th>Dist (km)</th>
+                <th>Ascent (m)</th>
+                <th>Descent (m)</th>
+                <th>Cum Dist</th>
+                <th>Cum Ascent</th>
+                <th>Cum Descent</th>
+                <th>Time</th>
+                <th>Cum Time</th>
+                {% if route.start_time %}<th>Time of Day</th>{% endif %}
+                <th>Override</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for leg in legs %}
+            {% set is_sunrise = solar_events.sunrise_leg == leg.leg_num %}
+            {% set is_sunset = solar_events.sunset_leg == leg.leg_num %}
+            <tr class="pace-tier-{{ leg.tier_index }} {{ 'overridden' if leg.override is not none else '' }} {{ 'sunrise-leg' if is_sunrise else '' }} {{ 'sunset-leg' if is_sunset else '' }}">
+                <td>{{ leg.leg_num }}</td>
+                <td>
+                    {{ leg.location }}
+                    {% if is_sunrise %}<span class="solar-badge sunrise-badge" title="Sunrise during this leg">☀↑</span>{% endif %}
+                    {% if is_sunset %}<span class="solar-badge sunset-badge" title="Sunset during this leg">☀↓</span>{% endif %}
+                </td>
+                <td><input type="number" step="0.1" name="distance_{{ leg.id }}" value="{{ '%.1f' | format(leg.distance_km) }}" class="stat-input"></td>
+                <td><input type="number" step="1" name="ascent_{{ leg.id }}" value="{{ '%.0f' | format(leg.ascent_m) }}" class="stat-input stat-input-narrow"></td>
+                <td><input type="number" step="1" name="descent_{{ leg.id }}" value="{{ '%.0f' | format(leg.descent_m) }}" class="stat-input stat-input-narrow"></td>
+                <td>{{ '%.1f' | format(leg.cumulative_distance) }}</td>
+                <td>{{ '%.0f' | format(leg.cumulative_ascent) }}</td>
+                <td>{{ '%.0f' | format(leg.cumulative_descent) }}</td>
+                <td>{{ format_time(leg.time) }}</td>
+                <td>{{ format_time(leg.cumulative_time) }}</td>
+                {% if route.start_time %}<td>{{ format_time_of_day(leg.time_of_day) }}</td>{% endif %}
+                <td>
+                    <input type="number" step="0.1" name="override_{{ leg.id }}"
+                           value="{{ leg.override if leg.override is not none else '' }}"
+                           placeholder="{{ '%.1f' | format(leg.calc_time) }}"
+                           class="override-input">
+                </td>
+                <td><input type="text" name="notes_{{ leg.id }}" value="{{ leg.notes }}" class="notes-input-inline" placeholder="notes"></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="totals-row">
+                <td colspan="2"><strong>Totals</strong></td>
+                <td><strong>{{ '%.1f' | format(totals.distance_km) }}</strong></td>
+                <td><strong>{{ '%.0f' | format(totals.ascent_m) }}</strong></td>
+                <td><strong>{{ '%.0f' | format(totals.descent_m) }}</strong></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td><strong>{{ format_time(totals.time) }}</strong></td>
+                <td></td>
+                {% if route.start_time %}<td></td>{% endif %}
+                <td></td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+    </div>
+    <button type="submit" class="btn btn-primary" style="margin-top: 0.5rem;">Save Changes</button>
+    </form>
+</section>
+
+<!-- Attempts -->
+<section class="section">
+    <h2>Previous Attempts</h2>
+
+    {% if attempts %}
+    <div class="attempt-controls">
+        <label>Compare:
+            <select id="compare-a">
+                <option value="plan">Calculated Plan</option>
+                {% for a in attempts %}
+                <option value="{{ a.id }}"{% if loop.first %} selected{% endif %}>{{ a.name }}{% if a.date %} ({{ a.date }}){% endif %}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Against:
+            <select id="compare-b">
+                <option value="plan" selected>Calculated Plan</option>
+                {% for a in attempts %}
+                <option value="{{ a.id }}">{{ a.name }}{% if a.date %} ({{ a.date }}){% endif %}</option>
+                {% endfor %}
+            </select>
+        </label>
+    </div>
+
+    <table class="attempts-table" id="attempts-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Location</th>
+                <th id="col-a-header">A</th>
+                <th id="col-b-header">B</th>
+                <th>Diff</th>
+                <th>%</th>
+                <th>Cum Diff</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for leg in legs %}
+            <tr data-leg-id="{{ leg.id }}">
+                <td>{{ leg.leg_num }}</td>
+                <td>{{ leg.location }}</td>
+                <td class="col-a"></td>
+                <td class="col-b"></td>
+                <td class="col-diff"></td>
+                <td class="col-pct"></td>
+                <td class="col-cum-diff"></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="totals-row">
+                <td colspan="2"><strong>Totals</strong></td>
+                <td class="col-a-total"><strong></strong></td>
+                <td class="col-b-total"><strong></strong></td>
+                <td class="col-diff-total"><strong></strong></td>
+                <td class="col-pct-total"><strong></strong></td>
+                <td></td>
+            </tr>
+        </tfoot>
+    </table>
+    {% endif %}
+
+    <details class="add-attempt">
+        <summary class="btn">+ Add Attempt</summary>
+        <form method="POST" action="{{ url_for('walks.create_attempt', route_id=route.id) }}">
+            <div class="form-group">
+                <label>Name <input type="text" name="attempt_name" required></label>
+            </div>
+            <div class="form-group">
+                <label>Date <input type="date" name="attempt_date"></label>
+            </div>
+            <div class="form-group">
+                <label>Notes <textarea name="attempt_notes" rows="2"></textarea></label>
+            </div>
+            <div class="form-group">
+                <label>Paste times (one per line, in minutes)</label>
+                <textarea id="attempt-csv" rows="4" placeholder="e.g.&#10;12.5&#10;45.0&#10;23.3"></textarea>
+                <button type="button" class="btn" onclick="importAttemptTimes()">Import Times</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Location</th>
+                        <th>Time (minutes)</th>
+                    </tr>
+                </thead>
+                <tbody id="attempt-times-body">
+                    {% for leg in legs %}
+                    <tr>
+                        <td>{{ leg.leg_num }}</td>
+                        <td>{{ leg.location }}</td>
+                        <td><input type="number" step="0.1" name="attempt_time_{{ leg.id }}"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button type="submit" class="btn btn-primary">Save Attempt</button>
+        </form>
+    </details>
+
+    {% if attempts %}
+    <div class="attempt-delete-section">
+        {% for a in attempts %}
+        <form method="POST" action="{{ url_for('walks.delete_attempt', route_id=route.id, attempt_id=a.id) }}"
+              onsubmit="return confirm('Delete attempt {{ a.name }}?')" style="display:inline">
+            <button type="submit" class="btn btn-small btn-danger">Delete {{ a.name }}</button>
+        </form>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+
+<script>
+const attemptsData = {{ attempts_json|safe }};
+const calculatedData = {{ calculated_json|safe }};
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('walks.static', filename='walks/detail.js') }}"></script>
+{% endblock %}
