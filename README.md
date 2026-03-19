@@ -13,8 +13,9 @@ python app.py
 
 Or simply: `./server.sh` (creates venv and installs dependencies automatically if needed).
 
-To start from the pre-populated database (routes, hills, and personal splits):
+To start from the pre-populated database (routes, hills, and personal splits) - rename walks_template.db to walks.dd
 
+or
 ```
 cp walks_template.db walks.db
 ```
