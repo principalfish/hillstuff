@@ -60,8 +60,12 @@ python app.py
 - **Never delete `walks.db` without backing it up first.** Copy to `walks.db.bak`, apply the migration, then reimport data. If the migration is too breaking for data to survive, ask the user before proceeding.
 - For verification/testing, use `SQLALCHEMY_DATABASE_URI=sqlite:///walks_test.db` — never test against `walks.db`
 
+## Hills blueprint (`hills/`)
+Tracks completion logs for Munros, Corbetts, and Wainwrights.
+- Models: `Hill` (name, height_m, rank, region, hill_type) and `HillAscent` (hill_id, date) in `hills/models.py`
+- Routes in `hills/routes.py`: list (`/<slug>`), new/edit/delete hill, add/delete ascent
+- Slugs: `munros`, `corbetts`, `wainwrights` → mapped to `hill_type` values `munro`, `corbett`, `wainwright`
+- Hill data pre-populated via import scripts in `old_data/`
+
 ## Future sections
-The app is structured for multiple sections as Blueprints. Planned:
-- Munro/Corbett/Wainwright logs (full detail: date, route, distance, ascent, time, companions, conditions, rating)
 - Per-year activity log (date, name, location, type, distance, ascent, time)
-- Schema for these is not yet created — will be added as models in `walks/models.py` when ready
