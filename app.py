@@ -34,7 +34,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
     elif os.path.exists(db.DATABASE):
-        shutil.copy2(db.DATABASE, db.DATABASE + '.bak')
+        shutil.copyfile(db.DATABASE, db.DATABASE + '.bak')
 
     app.jinja_env.filters['friendly_date'] = _friendly_date
 

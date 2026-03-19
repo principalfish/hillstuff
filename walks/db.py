@@ -6,7 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 PROJECT_ROOT: str = os.path.dirname(os.path.dirname(__file__))
-DATABASE: str = os.path.join(PROJECT_ROOT, 'walks.db')
+DATABASE: str = os.environ.get('WALKS_DB') or os.path.join(PROJECT_ROOT, 'walks.db')
 
 
 def init_app(app: Flask) -> None:
