@@ -1,4 +1,15 @@
-def get_tier_for_time(pace_tiers, cumulative_minutes):
+from typing import Any
+
+from walks.solar import SolarResult
+
+LegDict = dict[str, Any]
+TierDict = dict[str, Any]
+SolarEventsDict = dict[str, int | float | None]
+
+
+def get_tier_for_time(
+    pace_tiers: list[TierDict], cumulative_minutes: float
+) -> tuple[int, TierDict | None]:
     """Return the pace tier active at a given cumulative time.
 
     pace_tiers should be sorted by up_to_minutes ascending, with the
@@ -10,7 +21,12 @@ def get_tier_for_time(pace_tiers, cumulative_minutes):
     return (len(pace_tiers) - 1, pace_tiers[-1]) if pace_tiers else (0, None)
 
 
-def calculate_leg_times(legs, pace_tiers, overrides=None, start_time_minutes=None):
+def calculate_leg_times(
+    legs: list[LegDict],
+    pace_tiers: list[TierDict],
+    overrides: dict[int, float] | None = None,
+    start_time_minutes: float | None = None,
+) -> list[LegDict]:
     """Calculate time and cumulatives for each leg.
 
     Args:
@@ -25,11 +41,11 @@ def calculate_leg_times(legs, pace_tiers, overrides=None, start_time_minutes=Non
     if overrides is None:
         overrides = {}
 
-    cumulative_time = 0.0
-    cumulative_dist = 0.0
-    cumulative_ascent = 0.0
-    cumulative_descent = 0.0
-    results = []
+    cumulative_time: float = 0.0
+    cumulative_dist: float = 0.0
+    cumulative_ascent: float = 0.0
+    cumulative_descent: float = 0.0
+    results: list[LegDict] = []
 
     for leg in legs:
         tier_index, tier = get_tier_for_time(pace_tiers, cumulative_time)
@@ -49,7 +65,7 @@ def calculate_leg_times(legs, pace_tiers, overrides=None, start_time_minutes=Non
         cumulative_time += time
 
         # Time of day at arrival at this location
-        time_of_day = None
+        time_of_day: float | None = None
         if start_time_minutes is not None:
             time_of_day = start_time_minutes + cumulative_time
         cumulative_dist += leg['distance_km']
@@ -78,7 +94,11 @@ def calculate_leg_times(legs, pace_tiers, overrides=None, start_time_minutes=Non
     return results
 
 
-def find_solar_events(legs, start_time_minutes, solar):
+def find_solar_events(
+    legs: list[LegDict],
+    start_time_minutes: float,
+    solar: SolarResult,
+) -> SolarEventsDict:
     """Find which legs sunrise/sunset fall within.
 
     Returns dict with 'sunrise_leg' and 'sunset_leg' (leg_num or None).
@@ -87,13 +107,15 @@ def find_solar_events(legs, start_time_minutes, solar):
         return {'sunrise_leg': None, 'sunset_leg': None,
                 'sunrise_cum_time': None, 'sunset_cum_time': None}
 
-    sunrise_min = solar['sunrise'] * 60
-    sunset_min = solar['sunset'] * 60
+    sunrise_min: float = solar['sunrise'] * 60
+    sunset_min: float = solar['sunset'] * 60
 
-    result = {'sunrise_leg': None, 'sunset_leg': None,
-              'sunrise_cum_time': None, 'sunset_cum_time': None}
+    result: SolarEventsDict = {
+        'sunrise_leg': None, 'sunset_leg': None,
+        'sunrise_cum_time': None, 'sunset_cum_time': None,
+    }
 
-    cum_time = 0.0
+    cum_time: float = 0.0
     for leg in legs:
         leg_start_tod = start_time_minutes + cum_time
         cum_time += leg['time']
@@ -110,7 +132,7 @@ def find_solar_events(legs, start_time_minutes, solar):
     return result
 
 
-def format_time(minutes):
+def format_time(minutes: float | None) -> str:
     """Format minutes as H:MM:SS or M:SS."""
     if minutes is None:
         return ''
@@ -123,7 +145,7 @@ def format_time(minutes):
     return f'{mins}:{secs:02d}'
 
 
-def format_time_of_day(minutes):
+def format_time_of_day(minutes: float | None) -> str:
     """Format minutes-from-midnight as HH:MM."""
     if minutes is None:
         return ''
@@ -133,7 +155,7 @@ def format_time_of_day(minutes):
     return f'{h:02d}:{m:02d}'
 
 
-def format_diff(minutes):
+def format_diff(minutes: float | None) -> str:
     """Format a time difference with +/- prefix."""
     if minutes is None:
         return ''

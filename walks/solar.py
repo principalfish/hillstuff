@@ -1,9 +1,22 @@
 """Simple solar position calculator for sunrise/sunset times."""
 import math
 from datetime import datetime, timedelta
+from typing import TypedDict
 
 
-def solar_times(lat, lon, date_str):
+class SolarResult(TypedDict):
+    sunrise: float
+    sunset: float
+    solar_noon: float
+    daylight_hours: float
+    sunrise_str: str
+    sunset_str: str
+    solar_noon_str: str
+    daylight_str: str
+    timezone: str
+
+
+def solar_times(lat: float, lon: float, date_str: str) -> SolarResult | None:
     """Calculate sunrise, sunset, solar noon for a given location and date.
 
     Returns dict with times as fractional hours (UTC), or None for polar extremes.
@@ -61,7 +74,7 @@ def solar_times(lat, lon, date_str):
     }
 
 
-def _is_bst(date):
+def _is_bst(date: datetime) -> bool:
     """Check if a date falls within British Summer Time."""
     year = date.year
     # Last Sunday of March
@@ -82,7 +95,7 @@ def _is_bst(date):
     return bst_start <= date < bst_end
 
 
-def _hours_to_hhmm(hours):
+def _hours_to_hhmm(hours: float) -> str:
     """Convert fractional hours to HH:MM string."""
     h = int(hours)
     m = int(round((hours - h) * 60))

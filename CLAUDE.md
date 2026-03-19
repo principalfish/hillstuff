@@ -26,6 +26,18 @@ templates/          — Shared templates (base.html, home.html)
 static/             — Shared CSS, favicon
 ```
 
+## Typing
+- All Python code must have type annotations (function signatures, return types)
+- mypy runs as a pre-commit hook — code must pass `mypy walks/ app.py --config-file=mypy.ini`
+- `disallow_untyped_defs` and `disallow_incomplete_defs` are enforced in `mypy.ini`
+- Use `model_validate()` (not direct constructor) when passing form strings to Pydantic models with numeric fields
+
+## Testing
+- Run tests: `./test.sh` (or `pytest tests/` from venv)
+- Tests use in-memory SQLite — no file DB created
+- 89 tests across 4 files: calc, solar, schemas, routes
+- Route tests use the `sample_route` fixture for a 3-leg test route
+
 ## Key patterns
 - Legs use a single `location` column (not start/end). First leg = start point with 0 distance/ascent/descent.
 - Pace tiers are ordered by `up_to_minutes` ascending, NULL = unbounded final tier. Tier at leg start determines pace for that leg. Ascent pace is per 125m, descent pace is per 375m.
@@ -44,8 +56,9 @@ python app.py
 
 ## Database
 - `walks.db` is auto-created on first run via `db.create_all()`
-- Delete `walks.db` to reset all data
-- Add `walks.db` to `.gitignore`
+- Auto-backed up to `walks.db.bak` on every app startup
+- **Never delete `walks.db` without backing it up first.** Copy to `walks.db.bak`, apply the migration, then reimport data. If the migration is too breaking for data to survive, ask the user before proceeding.
+- For verification/testing, use `SQLALCHEMY_DATABASE_URI=sqlite:///walks_test.db` — never test against `walks.db`
 
 ## Future sections
 The app is structured for multiple sections as Blueprints. Planned:

@@ -28,7 +28,7 @@
             <td>{{ '%.1f' | format(r.total_distance) }}</td>
             <td>{{ '%.0f' | format(r.total_ascent) }}</td>
             <td>{{ '%.0f' | format(r.total_descent) }}</td>
-            <td>{{ r.created_at[:10] if r.created_at else '' }}</td>
+            <td>{{ r.created_at.strftime('%Y-%m-%d') if r.created_at else '' }}</td>
         </tr>
         {% endfor %}
     </tbody>

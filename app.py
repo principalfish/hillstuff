@@ -1,12 +1,18 @@
+import shutil
+import os
+
 from flask import Flask, render_template
 
 from walks import db
 import walks.models  # noqa: F401 — registers models with SQLAlchemy
 
 
-def create_app():
+def create_app() -> Flask:
     app = Flask(__name__)
     app.secret_key = 'dev'
+
+    if os.path.exists(db.DATABASE):
+        shutil.copy2(db.DATABASE, db.DATABASE + '.bak')
 
     db.init_app(app)
 
@@ -17,7 +23,7 @@ def create_app():
     app.register_blueprint(walks_bp, url_prefix='/walks')
 
     @app.route('/')
-    def home():
+    def home() -> str:
         return render_template('home.html')
 
     return app

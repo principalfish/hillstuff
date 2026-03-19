@@ -3,13 +3,15 @@ import io
 import json
 
 from flask import (
-    render_template, request, redirect, url_for, flash, jsonify
+    render_template, request, redirect, url_for, flash, jsonify, Response
 )
+from werkzeug.wrappers import Request as WerkzeugRequest, Response as WerkzeugResponse
 from pydantic import ValidationError
 from sqlalchemy import func
 
 from walks import bp
 from walks.calc import (
+    SolarEventsDict,
     calculate_leg_times, find_solar_events,
     format_time, format_time_of_day, format_diff,
 )
@@ -18,7 +20,7 @@ from walks.models import Route, Leg, PaceTier, TimeOverride, Attempt, AttemptLeg
 from walks.schemas import (
     RouteForm, LegForm, SettingsForm, PaceTierForm, LegUpdateForm, AttemptForm,
 )
-from walks.solar import solar_times
+from walks.solar import SolarResult, solar_times
 
 
 # (up_to_minutes, flat, ascent, descent) — ascent & descent default to flat
@@ -30,7 +32,7 @@ DEFAULT_PACE_TIERS = [
 
 
 @bp.route('/')
-def route_list():
+def route_list() -> str:
     routes = (
         db.session.query(
             Route,
@@ -64,14 +66,14 @@ def route_list():
 
 
 @bp.route('/new', methods=['GET', 'POST'])
-def route_new():
+def route_new() -> str | WerkzeugResponse:
     if request.method == 'POST':
         return _save_route(None)
     return render_template('walks/form.html', route=None, legs=[])
 
 
 @bp.route('/<int:route_id>/edit', methods=['GET', 'POST'])
-def route_edit(route_id):
+def route_edit(route_id: int) -> str | WerkzeugResponse:
     route = db.session.get(Route, route_id)
     if not route:
         flash('Route not found.', 'error')
@@ -84,13 +86,13 @@ def route_edit(route_id):
     return render_template('walks/form.html', route=route, legs=legs)
 
 
-def _save_route(route_id):
+def _save_route(route_id: int | None) -> WerkzeugResponse:
     try:
-        form = RouteForm(
-            name=request.form.get('name', ''),
-            latitude=request.form.get('latitude', '56.8'),
-            longitude=request.form.get('longitude', '-5.1'),
-        )
+        form = RouteForm.model_validate({
+            'name': request.form.get('name', ''),
+            'latitude': request.form.get('latitude', '56.8'),
+            'longitude': request.form.get('longitude', '-5.1'),
+        })
     except ValidationError as e:
         for err in e.errors():
             flash(f'{err["loc"][-1]}: {err["msg"]}', 'error')
@@ -101,6 +103,7 @@ def _save_route(route_id):
     if legs is None:
         return redirect(request.url)
 
+    route: Route
     if route_id is None:
         route = Route(name=form.name, latitude=form.latitude, longitude=form.longitude)
         db.session.add(route)
@@ -115,7 +118,9 @@ def _save_route(route_id):
                 descent_pace_min_per_375m=desc,
             ))
     else:
-        route = db.session.get(Route, route_id)
+        existing = db.session.get(Route, route_id)
+        assert existing is not None
+        route = existing
         route.name = form.name
         route.latitude = form.latitude
         route.longitude = form.longitude
@@ -138,7 +143,7 @@ def _save_route(route_id):
     return redirect(url_for('walks.route_detail', route_id=route_id))
 
 
-def _parse_legs(req) -> list[LegForm] | None:
+def _parse_legs(req: WerkzeugRequest) -> list[LegForm] | None:
     """Parse legs from either CSV input or form fields."""
     csv_text = req.form.get('csv_data', '').strip()
     csv_file = req.files.get('csv_file')
@@ -212,7 +217,7 @@ def _parse_csv(text: str) -> list[LegForm] | None:
 
 
 @bp.route('/<int:route_id>/delete', methods=['POST'])
-def route_delete(route_id):
+def route_delete(route_id: int) -> WerkzeugResponse:
     route = db.session.get(Route, route_id)
     if route:
         db.session.delete(route)
@@ -222,7 +227,7 @@ def route_delete(route_id):
 
 
 @bp.route('/<int:route_id>')
-def route_detail(route_id):
+def route_detail(route_id: int) -> str | WerkzeugResponse:
     route = db.session.get(Route, route_id)
     if not route:
         flash('Route not found.', 'error')
@@ -282,8 +287,8 @@ def route_detail(route_id):
     }
 
     # Solar data
-    solar = None
-    solar_events = {'sunrise_leg': None, 'sunset_leg': None}
+    solar: SolarResult | None = None
+    solar_events: SolarEventsDict = {'sunrise_leg': None, 'sunset_leg': None}
     if route.start_date and route.latitude and route.longitude:
         solar = solar_times(route.latitude, route.longitude, route.start_date)
         if solar and start_time_minutes is not None:
@@ -330,8 +335,9 @@ def route_detail(route_id):
 
 
 @bp.route('/<int:route_id>/settings', methods=['POST'])
-def save_settings(route_id):
+def save_settings(route_id: int) -> WerkzeugResponse:
     route = db.session.get(Route, route_id)
+    assert route is not None
     try:
         form = SettingsForm(
             start_time=request.form.get('start_time', ''),
@@ -349,7 +355,7 @@ def save_settings(route_id):
 
 
 @bp.route('/<int:route_id>/paces', methods=['POST'])
-def save_paces(route_id):
+def save_paces(route_id: int) -> WerkzeugResponse:
     PaceTier.query.filter_by(route_id=route_id).delete()
 
     i = 0
@@ -359,12 +365,12 @@ def save_paces(route_id):
             break
         up_to = request.form.get(f'up_to_{i}', '').strip()
         try:
-            form = PaceTierForm(
-                up_to_minutes=float(up_to) if up_to else None,
-                flat_pace_min_per_km=flat,
-                ascent_pace_min_per_125m=request.form.get(f'ascent_pace_{i}', '0'),
-                descent_pace_min_per_375m=request.form.get(f'descent_pace_{i}', '0'),
-            )
+            form = PaceTierForm.model_validate({
+                'up_to_minutes': float(up_to) if up_to else None,
+                'flat_pace_min_per_km': flat,
+                'ascent_pace_min_per_125m': request.form.get(f'ascent_pace_{i}', '0'),
+                'descent_pace_min_per_375m': request.form.get(f'descent_pace_{i}', '0'),
+            })
         except (ValidationError, ValueError) as e:
             if isinstance(e, ValidationError):
                 for err in e.errors():
@@ -387,19 +393,19 @@ def save_paces(route_id):
 
 
 @bp.route('/<int:route_id>/legs', methods=['POST'])
-def save_legs(route_id):
+def save_legs(route_id: int) -> WerkzeugResponse:
     legs = Leg.query.filter_by(route_id=route_id).all()
 
     for leg in legs:
         lid = leg.id
         try:
-            form = LegUpdateForm(
-                distance_km=request.form.get(f'distance_{lid}', '0'),
-                ascent_m=request.form.get(f'ascent_{lid}', '0'),
-                descent_m=request.form.get(f'descent_{lid}', '0'),
-                notes=request.form.get(f'notes_{lid}', '').strip(),
-                override_minutes=request.form.get(f'override_{lid}', ''),
-            )
+            form = LegUpdateForm.model_validate({
+                'distance_km': request.form.get(f'distance_{lid}', '0'),
+                'ascent_m': request.form.get(f'ascent_{lid}', '0'),
+                'descent_m': request.form.get(f'descent_{lid}', '0'),
+                'notes': request.form.get(f'notes_{lid}', '').strip(),
+                'override_minutes': request.form.get(f'override_{lid}', ''),
+            })
         except (ValidationError, ValueError):
             continue
         leg.distance_km = form.distance_km
@@ -425,7 +431,7 @@ def save_legs(route_id):
 
 
 @bp.route('/<int:route_id>/attempts', methods=['POST'])
-def create_attempt(route_id):
+def create_attempt(route_id: int) -> WerkzeugResponse:
     try:
         form = AttemptForm(
             name=request.form.get('attempt_name', ''),
@@ -468,7 +474,7 @@ def create_attempt(route_id):
 
 
 @bp.route('/<int:route_id>/attempts/<int:attempt_id>/delete', methods=['POST'])
-def delete_attempt(route_id, attempt_id):
+def delete_attempt(route_id: int, attempt_id: int) -> WerkzeugResponse:
     attempt = Attempt.query.filter_by(id=attempt_id, route_id=route_id).first()
     if attempt:
         db.session.delete(attempt)

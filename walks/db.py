@@ -1,16 +1,18 @@
 import os
 
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
-DATABASE = os.path.join(os.path.dirname(__file__), 'walks.db')
+PROJECT_ROOT: str = os.path.dirname(os.path.dirname(__file__))
+DATABASE: str = os.path.join(PROJECT_ROOT, 'walks.db')
 
 
-def init_app(app):
+def init_app(app: Flask) -> None:
     app.config.setdefault('SQLALCHEMY_DATABASE_URI', f'sqlite:///{DATABASE}')
     db.init_app(app)
 
 
-def init_db():
+def init_db() -> None:
     db.create_all()

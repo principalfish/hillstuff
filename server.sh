@@ -5,7 +5,7 @@ if [ ! -d "$DIR/venv" ]; then
     echo "Creating venv..."
     python3 -m venv "$DIR/venv"
     source "$DIR/venv/bin/activate"
-    pip install flask flask-sqlalchemy pydantic mypy
+    pip install flask flask-sqlalchemy pydantic mypy pre-commit pytest
 else
     source "$DIR/venv/bin/activate"
 fi
