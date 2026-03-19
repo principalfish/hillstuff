@@ -13,6 +13,12 @@ python app.py
 
 Or simply: `./server.sh` (creates venv and installs dependencies automatically if needed).
 
+To start from the pre-populated database (routes, hills, and personal splits):
+
+```
+cp walks_template.db walks.db
+```
+
 Visit http://localhost:5000
 
 ## Features
@@ -58,4 +64,8 @@ Per-year log of walks, runs, and cycles:
 ## Database
 `walks.db` is created automatically on first run. It is backed up to `walks.db.bak` on every startup.
 
-`walks_template.db` is a reference database (Finlay Wild splits + personal attempt splits for key routes) used as a starting point on new installs.
+`walks_template.db` is a reference database (Finlay Wild splits + personal attempt splits for key routes) used as a starting point on new installs. To use it:
+
+```
+cp walks_template.db walks.db
+```
