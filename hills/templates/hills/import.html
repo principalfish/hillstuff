@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Import Ascents — {{ label }}{% endblock %}
+
+{% block content %}
+<h1>Import Ascents — {{ label }}</h1>
+
+<div class="section">
+    <h2>Format</h2>
+    <p>Paste CSV data with two columns:</p>
+    <pre>hill_name,ascent_dates</pre>
+    <ul>
+        <li><strong>hill_name</strong> — exact name match (case-insensitive)</li>
+        <li><strong>ascent_dates</strong> — one or more dates separated by <code>;</code></li>
+        <li>Dates accepted as <code>YYYY-MM-DD</code> or <code>DD/MM/YYYY</code></li>
+        <li>Existing ascents for any hill in the import are <strong>replaced</strong></li>
+        <li>A header row (<code>hill_name,ascent_dates</code>) is optional and will be skipped</li>
+    </ul>
+    <h3>Example</h3>
+    <pre>hill_name,ascent_dates
+Ben Nevis,2023-07-15;2024-08-20
+Cairn Gorm,2022-09-03
+Buachaille Etive Mòr,01/06/2021;15/08/2023</pre>
+</div>
+
+{% if result and result.errors %}
+<div class="section">
+    <h2>Errors — nothing imported</h2>
+    <ul class="error-list">
+        {% for err in result.errors %}
+        <li class="error">{{ err }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<div class="section">
+    <form method="post">
+        <div class="form-group">
+            <label for="csv_data">CSV data</label>
+            <textarea id="csv_data" name="csv_data" rows="16" cols="60" placeholder="hill_name,ascent_dates&#10;Ben Nevis,2023-07-15">{{ csv_text }}</textarea>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Import</button>
+            <a href="{{ url_for('hills.hill_list', slug=slug) }}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

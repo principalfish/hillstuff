@@ -16,7 +16,6 @@
             <th>Legs</th>
             <th>Distance (km)</th>
             <th>Ascent (m)</th>
-            <th>Descent (m)</th>
             <th>Created</th>
         </tr>
     </thead>
@@ -27,7 +26,6 @@
             <td>{{ r.leg_count }}</td>
             <td>{{ '%.1f' | format(r.total_distance) }}</td>
             <td>{{ '%.0f' | format(r.total_ascent) }}</td>
-            <td>{{ '%.0f' | format(r.total_descent) }}</td>
             <td>{{ r.created_at.strftime('%Y-%m-%d') if r.created_at else '' }}</td>
         </tr>
         {% endfor %}

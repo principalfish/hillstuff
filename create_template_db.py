@@ -203,7 +203,7 @@ def import_ramsay() -> None:
                       distance_km=safe_float(row[4]),
                       ascent_m=safe_float(row[5]),
                       descent_m=safe_float(row[6]),
-                      notes=row[11].strip() if len(row) > 11 else '')
+                      notes='')
         legs.append(leg)
         if loc == 'Youth Hostel' and len(legs) > 1:
             break
@@ -240,7 +240,7 @@ def import_tranters() -> None:
                       distance_km=safe_float(row[1]),
                       ascent_m=safe_float(row[2]),
                       descent_m=safe_float(row[3]),
-                      notes=row[8].strip() if len(row) > 8 else '')
+                      notes='')
         legs.append(leg)
         if loc == 'Youth Hostel' and len(legs) > 1:
             break
@@ -277,7 +277,7 @@ def import_lochaber() -> None:
                       distance_km=safe_float(row[4]),
                       ascent_m=safe_float(row[5]),
                       descent_m=safe_float(row[6]),
-                      notes=row[11].strip() if len(row) > 11 else '')
+                      notes='')
         legs.append(leg)
         if loc == 'Youth Hostel' and len(legs) > 1:
             break
@@ -314,7 +314,7 @@ def import_mamores() -> None:
                       distance_km=safe_float(row[4]),
                       ascent_m=safe_float(row[5]),
                       descent_m=safe_float(row[6]),
-                      notes=row[11].strip() if len(row) > 11 else '')
+                      notes='')
         legs.append(leg)
 
     fw_mins = [round_min(parse_minutes(rows[14 + j][36])) if len(rows[14 + j]) > 36 else None
@@ -349,7 +349,7 @@ def import_mullardoch() -> None:
                       distance_km=safe_float(row[1]),
                       ascent_m=safe_float(row[2]),
                       descent_m=safe_float(row[3]),
-                      notes=row[8].strip() if len(row) > 8 else '')
+                      notes='')
         legs.append(leg)
         if loc == 'Dam' and len(legs) > 1:
             break
@@ -386,7 +386,7 @@ def import_shiel() -> None:
                       distance_km=safe_float(row[4]),
                       ascent_m=safe_float(row[5]),
                       descent_m=safe_float(row[6]),
-                      notes=row[11].strip() if len(row) > 11 else '')
+                      notes='')
         legs.append(leg)
         if loc == 'Cluanie' and len(legs) > 1:
             break
@@ -423,7 +423,7 @@ def import_assynt() -> None:
                       distance_km=safe_float(row[4]),
                       ascent_m=safe_float(row[5]),
                       descent_m=safe_float(row[6]),
-                      notes=row[11].strip() if len(row) > 11 else '')
+                      notes='')
         legs.append(leg)
         if loc == 'Quinag car park' and len(legs) > 1:
             break

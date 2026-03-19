@@ -75,6 +75,15 @@ document.addEventListener('DOMContentLoaded', function() {
         rows.forEach(function(row) { tbody.appendChild(row); });
     }
 
+    // --- Close actions dropdown on outside click ---
+    document.addEventListener('click', function(e) {
+        document.querySelectorAll('details.inline-details[open]').forEach(function(d) {
+            if (!d.contains(e.target)) {
+                d.removeAttribute('open');
+            }
+        });
+    });
+
     // --- Filtering ---
     var filterInput = document.getElementById('hills-filter');
     if (!filterInput) return;

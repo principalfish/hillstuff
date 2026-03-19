@@ -4,9 +4,12 @@ from flask import render_template, request, redirect, url_for, flash
 from pydantic import ValidationError
 from werkzeug.wrappers import Response as WerkzeugResponse
 
+import unicodedata
+
 from hills import bp
 from hills.models import Hill, HillAscent
 from hills.schemas import HillForm, AscentForm
+from hills.ascent_import import parse_ascent_csv
 from walks.db import db
 
 
@@ -121,12 +124,13 @@ def _build_year_stats(hills: list[Hill]) -> list[dict[str, int]]:
         new = new_per_year.get(year, 0)
         total_ascents = ascents_per_year.get(year, 0)
         cumulative += new
-        stats.append({
-            'year': year,
-            'new': new,
-            'ascents': total_ascents,
-            'cumulative': cumulative,
-        })
+        if new or total_ascents:
+            stats.append({
+                'year': year,
+                'new': new,
+                'ascents': total_ascents,
+                'cumulative': cumulative,
+            })
 
     return stats
 
@@ -239,6 +243,54 @@ def add_ascent(slug: str, hill_id: int) -> WerkzeugResponse:
     db.session.commit()
     flash('Ascent recorded.', 'success')
     return redirect(url_for('hills.hill_list', slug=slug))
+
+
+@bp.route('/<slug>/import', methods=['GET', 'POST'])
+def import_ascents(slug: str) -> str | WerkzeugResponse:
+    hill_type = _resolve_hill_type(slug)
+    if hill_type is None:
+        flash('Unknown hill type.', 'error')
+        return redirect(url_for('home'))
+
+    hills = (Hill.query.filter_by(hill_type=hill_type)
+             .order_by(Hill.name).all())
+    hills_by_name = {unicodedata.normalize('NFC', h.name.lower()): h.id for h in hills}
+
+    csv_text = ''
+    result = None
+
+    if request.method == 'POST':
+        csv_text = request.form.get('csv_data', '').strip()
+        if not csv_text:
+            flash('No data provided.', 'error')
+        else:
+            result = parse_ascent_csv(csv_text, hills_by_name)
+            if result.ok:
+                if not result.ascents:
+                    flash('No ascents found in the data.', 'error')
+                else:
+                    # Reset ascents for all hills present in the import
+                    hill_ids = {a.hill_id for a in result.ascents}
+                    HillAscent.query.filter(
+                        HillAscent.hill_id.in_(hill_ids)
+                    ).delete(synchronize_session=False)
+                    for a in result.ascents:
+                        db.session.add(HillAscent(hill_id=a.hill_id, date=a.date))
+                    db.session.commit()
+                    flash(
+                        f'Imported {len(result.ascents)} ascent(s) for '
+                        f'{len(hill_ids)} hill(s).',
+                        'success',
+                    )
+                    return redirect(url_for('hills.hill_list', slug=slug))
+
+    return render_template(
+        'hills/import.html',
+        slug=slug,
+        label=HILL_TYPE_LABELS[hill_type],
+        csv_text=csv_text,
+        result=result,
+    )
 
 
 @bp.route('/<slug>/<int:hill_id>/ascents/<int:ascent_id>/delete', methods=['POST'])

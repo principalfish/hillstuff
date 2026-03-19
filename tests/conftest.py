@@ -1,21 +1,20 @@
-import os
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient
-
-# Use test database
-os.environ['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///walks_test.db'
 
 from app import create_app
 from walks.db import db as _db
 from walks.models import Route, Leg, PaceTier
 
+TEST_CONFIG = {
+    'TESTING': True,
+    'SQLALCHEMY_DATABASE_URI': 'sqlite://',  # in-memory, never touches walks.db
+}
+
 
 @pytest.fixture()
 def app() -> Flask:
-    app = create_app()
-    app.config['TESTING'] = True
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://'  # in-memory
+    app = create_app(test_config=TEST_CONFIG)
     with app.app_context():
         _db.drop_all()
         _db.create_all()
@@ -37,7 +36,7 @@ def db_session(app: Flask):  # type: ignore[no-untyped-def]
 @pytest.fixture()
 def sample_route(client: FlaskClient) -> int:
     """Create a route with 3 legs and return its ID."""
-    r = client.post('/walks/new', data={
+    r = client.post('/bigruns/new', data={
         'name': 'Mamores',
         'latitude': '56.8',
         'longitude': '-5.1',
@@ -57,6 +56,5 @@ def sample_route(client: FlaskClient) -> int:
         'leg_descent_2': '3',
         'leg_notes_2': 'steep',
     })
-    # Extract route_id from redirect location
     loc = r.headers['Location']
     return int(loc.split('/')[-1])

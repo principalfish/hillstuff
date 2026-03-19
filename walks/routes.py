@@ -25,9 +25,12 @@ from walks.solar import SolarResult, solar_times
 
 # (up_to_minutes, flat, ascent, descent) — ascent & descent default to flat
 DEFAULT_PACE_TIERS = [
-    (120, 5.0, 5.0, 5.0),
-    (300, 6.0, 6.0, 6.0),
-    (None, 7.0, 7.0, 7.0),
+    (60,   6.0, 6.0, 6.0),
+    (180,  6.5, 6.5, 6.5),
+    (300,  7.0, 7.0, 7.0),
+    (420,  7.5, 7.5, 7.5),
+    (540,  8.0, 8.0, 8.0),
+    (None, 8.5, 8.5, 8.5),
 ]
 
 

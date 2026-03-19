@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Log {{ year }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Activity Log</h1>
+    <div class="header-actions">
+        <select onchange="window.location='/logs/' + this.value" style="width:auto">
+            {% for y in available_years %}
+            <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+        </select>
+        {% if year == current_year %}
+        <a href="{{ url_for('logs.new_entry', year=year) }}" class="btn btn-primary">+ New Entry</a>
+        {% endif %}
+    </div>
+</div>
+
+{% if munros_total or corbetts_total or wainwrights_total or avg_rating is not none %}
+<div class="section" style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start">
+
+    {% if munros_total or corbetts_total or wainwrights_total %}
+    <table style="width:auto">
+        <thead>
+            <tr><th></th><th>Run</th><th>Walk</th><th>Total</th></tr>
+        </thead>
+        <tbody>
+            {% if munros_total %}
+            <tr>
+                <td><strong>Munros</strong></td>
+                <td>{{ munros_run or '' }}</td>
+                <td>{{ munros_walk or '' }}</td>
+                <td>{{ munros_total }}</td>
+            </tr>
+            {% endif %}
+            {% if corbetts_total %}
+            <tr>
+                <td><strong>Corbetts</strong></td>
+                <td>{{ corbetts_run or '' }}</td>
+                <td>{{ corbetts_walk or '' }}</td>
+                <td>{{ corbetts_total }}</td>
+            </tr>
+            {% endif %}
+            {% if wainwrights_total %}
+            <tr>
+                <td><strong>Wainwrights</strong></td>
+                <td>{{ wainwrights_run or '' }}</td>
+                <td>{{ wainwrights_walk or '' }}</td>
+                <td>{{ wainwrights_total }}</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if avg_rating is not none %}
+    <table style="width:auto">
+        <tbody>
+            <tr><td><strong>Avg Rating</strong></td><td>{{ avg_rating }}</td></tr>
+        </tbody>
+    </table>
+    {% endif %}
+
+</div>
+{% endif %}
+
+<div class="section">
+    {% if entries %}
+    <div style="margin-bottom:0.75rem">
+        <input type="text" id="log-filter" placeholder="Filter by region, with, hills, notes…" style="width:22rem;max-width:100%">
+    </div>
+    <div class="table-scroll">
+    <table id="log-table">
+        <thead>
+            <tr>
+                <th class="sortable" data-col="0">Date</th>
+                <th class="sortable" data-col="1">km</th>
+                <th class="sortable" data-col="2">Ascent</th>
+                <th class="sortable" data-col="3">Type</th>
+                <th>With</th>
+                <th class="sortable" data-col="5">Region</th>
+                <th>Hills</th>
+                <th title="Munros" class="sortable" data-col="7">M</th>
+                <th title="Corbetts" class="sortable" data-col="8">C</th>
+                <th title="Wainwrights" class="sortable" data-col="9">W</th>
+                <th class="sortable" data-col="10">Rating</th>
+                <th>Notes</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in entries %}
+            <tr>
+                <td style="white-space:nowrap" data-sort="{{ e.date }}">{{ e.date_display | friendly_date }}</td>
+                <td>{% if e.distance_km is not none %}{{ '%.1f' | format(e.distance_km) }}{% endif %}</td>
+                <td>{{ e.ascent_m or '' }}</td>
+                <td>{{ (e.activity_type or '') | capitalize }}</td>
+                <td>{{ e.with_whom or '' }}</td>
+                <td>{{ e.region or '' }}</td>
+                <td class="notes-cell">{{ e.hills_text or '' }}</td>
+                <td>{{ e.munros_count or '' }}</td>
+                <td>{{ e.corbetts_count or '' }}</td>
+                <td>{{ e.wainwrights_count or '' }}</td>
+                <td>{{ e.rating or '' }}</td>
+                <td class="notes-cell">{{ e.notes or '' }}</td>
+                <td><a href="{{ url_for('logs.edit_entry', year=year, entry_id=e.id) }}" class="btn btn-small">Edit</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p>No entries for {{ year }}.{% if year == current_year %} <a href="{{ url_for('logs.new_entry', year=year) }}">Add one</a>.{% endif %}</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('logs.static', filename='logs/log.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}New Entry — {{ year }}{% endblock %}
+
+{% block content %}
+<h1>New Entry — {{ year }}</h1>
+
+<form method="POST">
+    <div class="form-group">
+        <label for="date">Date</label>
+        <input type="date" id="date" name="date" required>
+    </div>
+    <div class="form-group">
+        <label for="distance_km">Distance (km)</label>
+        <input type="number" step="0.01" min="0" id="distance_km" name="distance_km">
+    </div>
+    <div class="form-group">
+        <label for="ascent_m">Ascent (m)</label>
+        <input type="number" step="1" min="0" id="ascent_m" name="ascent_m">
+    </div>
+    <div class="form-group">
+        <label for="activity_type">Type</label>
+        <select id="activity_type" name="activity_type" style="width:auto">
+            <option value="">—</option>
+            <option value="walk">Walk</option>
+            <option value="run">Run</option>
+            <option value="cycle">Cycle</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="with_whom">With</label>
+        <input type="text" id="with_whom" name="with_whom" placeholder="Solo, or names...">
+    </div>
+    <div class="form-group">
+        <label for="region">Region</label>
+        <input type="text" id="region" name="region">
+    </div>
+    <div class="form-group">
+        <label for="hills_text">Hills (free text)</label>
+        <input type="text" id="hills_text" name="hills_text">
+    </div>
+    <div class="form-group">
+        <label for="notes">Notes</label>
+        <textarea id="notes" name="notes" rows="3"></textarea>
+    </div>
+    <div class="form-group">
+        <label for="rating">Rating (1–10)</label>
+        <input type="number" step="1" min="1" max="10" id="rating" name="rating">
+    </div>
+
+    <h2>Link Hills</h2>
+    <p class="help-text">Link specific hills to auto-count Munros / Corbetts / Wainwrights.</p>
+    <div class="form-group" style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap">
+        <select id="hill-type-select" style="width:auto">
+            <option value="">— type —</option>
+            <option value="munro">Munro</option>
+            <option value="corbett">Corbett</option>
+            <option value="wainwright">Wainwright</option>
+        </select>
+        <select id="hill-name-select" style="width:16rem" disabled>
+            <option value="">— choose hill —</option>
+        </select>
+        <button type="button" class="btn" id="add-hill-btn" disabled>Add</button>
+    </div>
+    <div id="linked-hills-list" style="margin-bottom:1rem"></div>
+
+    <h2>Hill Counts</h2>
+    <p class="help-text">Auto-filled from linked hills above. Edit manually if not linking.</p>
+    <div class="form-group">
+        <label for="munros_count">Munros</label>
+        <input type="number" step="1" min="0" id="munros_count" name="munros_count" value="0">
+    </div>
+    <div class="form-group">
+        <label for="corbetts_count">Corbetts</label>
+        <input type="number" step="1" min="0" id="corbetts_count" name="corbetts_count" value="0">
+    </div>
+    <div class="form-group">
+        <label for="wainwrights_count">Wainwrights</label>
+        <input type="number" step="1" min="0" id="wainwrights_count" name="wainwrights_count" value="0">
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Entry</button>
+        <a href="{{ url_for('logs.year_view', year=year) }}" class="btn">Cancel</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('logs.static', filename='logs/log.js') }}"></script>
+{% endblock %}
