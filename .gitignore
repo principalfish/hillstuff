@@ -2,8 +2,3 @@ __pycache__/
 *.pyc
 .DS_Store
 venv/
-walks.db
-walks.db.bak
-walks_test.db
-
-old_data/*
