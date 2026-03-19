@@ -13,6 +13,9 @@
         <a href="{{ url_for('home') }}" class="nav-brand">Hills & Runs</a>
         <div class="nav-links">
             <a href="{{ url_for('walks.route_list') }}">Big Runs</a>
+            <a href="{{ url_for('hills.hill_list', slug='munros') }}">Munros</a>
+            <a href="{{ url_for('hills.hill_list', slug='corbetts') }}">Corbetts</a>
+            <a href="{{ url_for('hills.hill_list', slug='wainwrights') }}">Wainwrights</a>
         </div>
     </nav>
     <main>

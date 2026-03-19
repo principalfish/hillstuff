@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}{{ label }}{% endblock %}
+
+{% block content %}
+<h1>{{ label }}</h1>
+<p class="help-text">{{ description }}</p>
+<p class="help-text">{{ climbed_count }} of {{ total_hills }} climbed</p>
+
+{% if year_stats %}
+<div class="section">
+    <h2>Year Breakdown</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Year</th>
+                <th>New</th>
+                <th>Total Ascents</th>
+                <th>Cumulative</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ys in year_stats %}
+            <tr>
+                <td>{{ ys.year }}</td>
+                <td>{{ ys.new }}</td>
+                <td>{{ ys.ascents }}</td>
+                <td>{{ ys.cumulative }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="totals-row">
+                <td>Total</td>
+                <td>{{ year_stats | sum(attribute='new') }}</td>
+                <td>{{ year_stats | sum(attribute='ascents') }}</td>
+                <td>{{ year_stats[-1].cumulative }}</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+{% endif %}
+
+<div class="section">
+    <h2>All {{ label }}</h2>
+    {% if hills %}
+    <div class="filter-bar">
+        <input type="text" id="hills-filter" placeholder="Filter by name, region...">
+        <span class="help-text">Click column to sort. Shift+click for multi-sort.</span>
+    </div>
+    <div class="table-scroll">
+    <table id="hills-table">
+        <thead>
+            <tr>
+                <th data-sort="rank" data-type="number">Rank</th>
+                <th data-sort="name">Name</th>
+                <th data-sort="height" data-type="number">Height (m)</th>
+                <th data-sort="region">Region</th>
+                <th data-sort="ascents" data-type="number">Ascents</th>
+                <th data-sort="firstyear" data-type="number">First Year</th>
+                <th>Dates</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in hills %}
+            <tr>
+                <td data-rank="{{ h.rank or 9999 }}">{{ h.rank or '' }}</td>
+                <td data-name="{{ h.name }}">{{ h.name }}</td>
+                <td data-height="{{ h.height_m }}">{{ h.height_m }}</td>
+                <td data-region="{{ h.region }}">{{ h.region }}</td>
+                <td data-ascents="{{ h.ascent_count }}">{{ h.ascent_count }}</td>
+                <td data-firstyear="{{ h.first_year or 0 }}">{{ h.first_year or '' }}</td>
+                <td class="notes-cell">{{ h.ascent_dates | join(', ') }}</td>
+                <td>
+                    <details class="inline-details">
+                        <summary class="btn btn-small">Actions</summary>
+                        <div class="actions-dropdown">
+                            <form method="post" action="{{ url_for('hills.add_ascent', slug=slug, hill_id=h.id) }}" class="inline-form">
+                                <input type="date" name="date" required>
+                                <button type="submit" class="btn btn-small btn-primary">+ Ascent</button>
+                            </form>
+                            <div class="inline-form"><a href="{{ url_for('hills.hill_edit', slug=slug, hill_id=h.id) }}" class="btn btn-small">Edit</a></div>
+                        </div>
+                    </details>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p>No hills yet. <a href="{{ url_for('hills.hill_new', slug=slug) }}">Add one</a>.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('hills.static', filename='hills/list.js') }}"></script>
+{% endblock %}

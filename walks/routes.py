@@ -354,6 +354,16 @@ def save_settings(route_id: int) -> WerkzeugResponse:
     return redirect(url_for('walks.route_detail', route_id=route_id))
 
 
+@bp.route('/<int:route_id>/notes', methods=['POST'])
+def save_notes(route_id: int) -> WerkzeugResponse:
+    route = db.session.get(Route, route_id)
+    assert route is not None
+    route.notes = request.form.get('notes', '')
+    db.session.commit()
+    flash('Notes saved.', 'success')
+    return redirect(url_for('walks.route_detail', route_id=route_id))
+
+
 @bp.route('/<int:route_id>/paces', methods=['POST'])
 def save_paces(route_id: int) -> WerkzeugResponse:
     PaceTier.query.filter_by(route_id=route_id).delete()

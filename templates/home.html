@@ -7,5 +7,17 @@
         <h2>Big Runs</h2>
         <p>Plan and analyze long-distance routes with pace tiers and attempt tracking.</p>
     </a>
+    <a href="{{ url_for('hills.hill_list', slug='munros') }}" class="section-card">
+        <h2>Munros</h2>
+        <p>Scottish mountains over 3,000ft. Track ascents and progress.</p>
+    </a>
+    <a href="{{ url_for('hills.hill_list', slug='corbetts') }}" class="section-card">
+        <h2>Corbetts</h2>
+        <p>Scottish mountains between 2,500ft and 3,000ft.</p>
+    </a>
+    <a href="{{ url_for('hills.hill_list', slug='wainwrights') }}" class="section-card">
+        <h2>Wainwrights</h2>
+        <p>Lake District fells catalogued by Alfred Wainwright.</p>
+    </a>
 </div>
 {% endblock %}

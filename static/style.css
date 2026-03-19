@@ -52,14 +52,19 @@ h3 { margin: 1rem 0 0.5rem; color: #555; }
 
 /* Buttons */
 .btn {
-    display: inline-block;
-    padding: 0.4rem 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2.25rem;
+    padding: 0 0.8rem;
     border: 1px solid #ccc;
     border-radius: 4px;
     background: #fff;
     color: #333;
     text-decoration: none;
     font-size: 0.875rem;
+    font-family: inherit;
+    line-height: 1;
     cursor: pointer;
 }
 
@@ -289,6 +294,41 @@ textarea { width: 100%; font-family: inherit; }
 /* Comparison row shading */
 .row-faster { background-color: #e8f5e9; }
 .row-slower { background-color: #ffebee; }
+
+/* Sortable table headers */
+th[data-sort]:hover { background: #eee; }
+th.sort-asc::after { content: ' \25B2'; font-size: 0.7rem; }
+th.sort-desc::after { content: ' \25BC'; font-size: 0.7rem; }
+.sort-badge { font-size: 0.65rem; color: #888; }
+
+/* Filter bar */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+.filter-bar input[type="text"] { max-width: 20rem; }
+
+/* Hill list actions */
+.inline-details { position: relative; }
+.inline-details summary { list-style: none; }
+.inline-details summary::-webkit-details-marker { display: none; }
+.actions-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    z-index: 10;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
 
 /* Responsive */
 @media (max-width: 768px) {

@@ -5,6 +5,7 @@ from flask import Flask, render_template
 
 from walks import db
 import walks.models  # noqa: F401 — registers models with SQLAlchemy
+import hills.models  # noqa: F401 — registers hills models with SQLAlchemy
 
 
 def create_app() -> Flask:
@@ -21,6 +22,9 @@ def create_app() -> Flask:
 
     from walks import bp as walks_bp
     app.register_blueprint(walks_bp, url_prefix='/walks')
+
+    from hills import bp as hills_bp
+    app.register_blueprint(hills_bp, url_prefix='/hills')
 
     @app.route('/')
     def home() -> str:

@@ -11,6 +11,7 @@ class Route(db.Model):
     longitude = db.Column(db.Float, default=-5.1)
     start_time = db.Column(db.Text, default='06:00')
     start_date = db.Column(db.Text, default='2026-06-01')
+    notes = db.Column(db.Text, default='')
     created_at = db.Column(db.DateTime, server_default=func.now())
 
     legs = db.relationship('Leg', backref='route', cascade='all, delete-orphan',
