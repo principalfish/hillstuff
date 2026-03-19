@@ -41,8 +41,8 @@ class SettingsForm(BaseModel):
 class PaceTierForm(BaseModel):
     up_to_minutes: float | None = None
     flat_pace_min_per_km: float = Field(gt=0)
-    ascent_pace_min_per_125m: float = Field(ge=0, default=0)
-    descent_pace_min_per_375m: float = Field(ge=0, default=0)
+    ascent_pace_min_per_150m: float = Field(ge=0, default=0)
+    descent_pace_min_per_450m: float = Field(ge=0, default=0)
 
 
 class LegUpdateForm(BaseModel):

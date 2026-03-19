@@ -117,8 +117,8 @@ def _save_route(route_id: int | None) -> WerkzeugResponse:
                 route_id=route_id,
                 up_to_minutes=up_to,
                 flat_pace_min_per_km=flat,
-                ascent_pace_min_per_125m=asc,
-                descent_pace_min_per_375m=desc,
+                ascent_pace_min_per_150m=asc,
+                descent_pace_min_per_450m=desc,
             ))
     else:
         existing = db.session.get(Route, route_id)
@@ -267,8 +267,8 @@ def route_detail(route_id: int) -> str | WerkzeugResponse:
         {
             'id': t.id, 'route_id': t.route_id, 'up_to_minutes': t.up_to_minutes,
             'flat_pace_min_per_km': t.flat_pace_min_per_km,
-            'ascent_pace_min_per_125m': t.ascent_pace_min_per_125m,
-            'descent_pace_min_per_375m': t.descent_pace_min_per_375m,
+            'ascent_pace_min_per_150m': t.ascent_pace_min_per_150m,
+            'descent_pace_min_per_450m': t.descent_pace_min_per_450m,
         }
         for t in pace_tiers
     ]
@@ -381,8 +381,8 @@ def save_paces(route_id: int) -> WerkzeugResponse:
             form = PaceTierForm.model_validate({
                 'up_to_minutes': float(up_to) if up_to else None,
                 'flat_pace_min_per_km': flat,
-                'ascent_pace_min_per_125m': request.form.get(f'ascent_pace_{i}', '0'),
-                'descent_pace_min_per_375m': request.form.get(f'descent_pace_{i}', '0'),
+                'ascent_pace_min_per_150m': request.form.get(f'ascent_pace_{i}', '0'),
+                'descent_pace_min_per_450m': request.form.get(f'descent_pace_{i}', '0'),
             })
         except (ValidationError, ValueError) as e:
             if isinstance(e, ValidationError):
@@ -395,8 +395,8 @@ def save_paces(route_id: int) -> WerkzeugResponse:
             route_id=route_id,
             up_to_minutes=form.up_to_minutes,
             flat_pace_min_per_km=form.flat_pace_min_per_km,
-            ascent_pace_min_per_125m=form.ascent_pace_min_per_125m,
-            descent_pace_min_per_375m=form.descent_pace_min_per_375m,
+            ascent_pace_min_per_150m=form.ascent_pace_min_per_150m,
+            descent_pace_min_per_450m=form.descent_pace_min_per_450m,
         ))
         i += 1
 

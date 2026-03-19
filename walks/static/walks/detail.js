@@ -150,6 +150,8 @@ function submitAndReload(form) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('#pace-body tr').forEach(bindFlatPaceAutoFill);
+
     const compareA = document.getElementById('compare-a');
     const compareB = document.getElementById('compare-b');
 
@@ -213,6 +215,22 @@ function importAttemptTimes() {
 }
 
 // Pace tier management
+function bindFlatPaceAutoFill(row) {
+    const flat = row.querySelector('input[name^="flat_pace_"]');
+    const ascent = row.querySelector('input[name^="ascent_pace_"]');
+    const descent = row.querySelector('input[name^="descent_pace_"]');
+    if (!flat || !ascent || !descent) return;
+
+    [ascent, descent].forEach(el => {
+        el.addEventListener('input', () => { el.dataset.overridden = '1'; });
+    });
+
+    flat.addEventListener('input', () => {
+        if (!ascent.dataset.overridden) ascent.value = flat.value;
+        if (!descent.dataset.overridden) descent.value = flat.value;
+    });
+}
+
 function addPaceTier() {
     const tbody = document.getElementById('pace-body');
     const idx = tbody.querySelectorAll('tr').length;
@@ -225,6 +243,7 @@ function addPaceTier() {
         <td><button type="button" class="btn btn-small btn-danger" onclick="removePaceTier(this)">×</button></td>
     `;
     tbody.appendChild(tr);
+    bindFlatPaceAutoFill(tr);
 }
 
 function removePaceTier(btn) {

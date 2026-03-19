@@ -91,8 +91,8 @@ class TestPaceTierForm:
     def test_valid(self) -> None:
         form = PaceTierForm.model_validate({
             'flat_pace_min_per_km': '5.0',
-            'ascent_pace_min_per_125m': '5.0',
-            'descent_pace_min_per_375m': '5.0',
+            'ascent_pace_min_per_150m': '5.0',
+            'descent_pace_min_per_450m': '5.0',
         })
         assert form.flat_pace_min_per_km == 5.0
         assert form.up_to_minutes is None
@@ -103,7 +103,7 @@ class TestPaceTierForm:
 
     def test_negative_ascent_rejected(self) -> None:
         with pytest.raises(ValidationError):
-            PaceTierForm(flat_pace_min_per_km=5, ascent_pace_min_per_125m=-1)
+            PaceTierForm(flat_pace_min_per_km=5, ascent_pace_min_per_150m=-1)
 
     def test_with_up_to(self) -> None:
         form = PaceTierForm(flat_pace_min_per_km=5, up_to_minutes=120)

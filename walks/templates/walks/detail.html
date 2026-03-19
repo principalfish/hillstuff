@@ -85,8 +85,8 @@
                 <tr>
                     <th>Up to (minutes)</th>
                     <th>Flat (min/km)</th>
-                    <th>Ascent (min/125m)</th>
-                    <th>Descent (min/375m)</th>
+                    <th>Ascent (min/150m)</th>
+                    <th>Descent (min/450m)</th>
                     <th></th>
                 </tr>
             </thead>
@@ -95,8 +95,8 @@
                 <tr>
                     <td><input type="number" step="1" name="up_to_{{ loop.index0 }}" value="{{ tier.up_to_minutes|default('', true) }}" placeholder="∞"></td>
                     <td><input type="number" step="0.1" name="flat_pace_{{ loop.index0 }}" value="{{ tier.flat_pace_min_per_km }}" required></td>
-                    <td><input type="number" step="0.1" name="ascent_pace_{{ loop.index0 }}" value="{{ tier.ascent_pace_min_per_125m }}" required></td>
-                    <td><input type="number" step="0.1" name="descent_pace_{{ loop.index0 }}" value="{{ tier.descent_pace_min_per_375m }}" required></td>
+                    <td><input type="number" step="0.1" name="ascent_pace_{{ loop.index0 }}" value="{{ tier.ascent_pace_min_per_150m }}" required></td>
+                    <td><input type="number" step="0.1" name="descent_pace_{{ loop.index0 }}" value="{{ tier.descent_pace_min_per_450m }}" required></td>
                     <td><button type="button" class="btn btn-small btn-danger" onclick="removePaceTier(this)">×</button></td>
                 </tr>
                 {% endfor %}
