@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Import Log Entries{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Import Log Entries</h1>
+    <a href="{{ url_for('logs.index') }}" class="btn">Back</a>
+</div>
+
+<div class="section">
+    <p>Paste CSV data below. The first row must be the header. Columns:</p>
+    <table style="width:auto;margin-bottom:1rem">
+        <thead>
+            <tr><th>Column</th><th>Format</th><th>Required</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>date</code></td><td>YYYY-MM-DD</td><td>Yes</td></tr>
+            <tr><td><code>distance_km</code></td><td>Decimal, e.g. <code>26.5</code></td><td></td></tr>
+            <tr><td><code>ascent_m</code></td><td>Integer metres, e.g. <code>1800</code></td><td></td></tr>
+            <tr><td><code>activity_type</code></td><td><code>walk</code>, <code>run</code>, or <code>cycle</code></td><td></td></tr>
+            <tr><td><code>with_whom</code></td><td>Text</td><td></td></tr>
+            <tr><td><code>region</code></td><td>Text</td><td></td></tr>
+            <tr><td><code>notes</code></td><td>Text</td><td></td></tr>
+            <tr><td><code>hills_text</code></td><td>Text</td><td></td></tr>
+            <tr><td><code>munros_count</code></td><td>Integer</td><td></td></tr>
+            <tr><td><code>corbetts_count</code></td><td>Integer</td><td></td></tr>
+            <tr><td><code>wainwrights_count</code></td><td>Integer</td><td></td></tr>
+            <tr><td><code>rating</code></td><td>Integer 1–10</td><td></td></tr>
+        </tbody>
+    </table>
+    <p class="help-text">Columns may appear in any order. Extra columns are ignored. Rows without a date are skipped.</p>
+
+    <form method="POST">
+        <div class="form-group">
+            <label for="year">Year</label>
+            <select id="year" name="year" style="width:auto" required>
+                <option value="">— select —</option>
+                {% for y in available_years %}
+                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="csv_data">CSV Data</label>
+            <textarea id="csv_data" name="csv_data" rows="16"
+                      style="font-family:monospace;font-size:0.85em;width:100%;max-width:60rem"
+                      placeholder="date,distance_km,ascent_m,activity_type,with_whom,region,notes,hills_text,munros_count,corbetts_count,wainwrights_count,rating
+2026-01-05,26.5,1800,walk,Solo,Cairngorms,Lovely day,Lochnagar,1,0,0,8"></textarea>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Import</button>
+            <a href="{{ url_for('logs.index') }}" class="btn">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

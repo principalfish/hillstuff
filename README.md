@@ -38,8 +38,15 @@ Track completion logs for Scottish and English hill lists:
 - **Hill data** — name, height, rank, and region per hill; pre-populated via import scripts
 - **Add / edit / delete** — manage hills and ascent records
 
-### Planned
-- Per-year walk/run activity log
+### Activity Log
+Per-year log of walks, runs, and cycles:
+- **Year view** — tabular log with sortable columns (date, km, ascent, type, region, Munros, Corbetts, Wainwrights, rating) and a text filter (region, with, hills, notes)
+- **Summary** — hill type grid (run / walk / total per Munro / Corbett / Wainwright) and average rating
+- **New entry** — form for current year with hill picker (auto-counts Munros / Corbetts / Wainwrights from linked hills and updates hills_text)
+- **Edit entry** — edit any existing entry; hill changes sync HillAscent records automatically
+- **CSV import** — paste CSV with flexible column order; column reference shown on page; year selector
+- **Friendly dates** — stored as ISO (for sorting), displayed as "2nd January"
+- Historical data 2019–2026 imported from spreadsheet exports via `old_data/import_all.py` and `old_data/import_2025.py`
 
 ## Tech stack
 - Flask + Jinja2 (server-rendered, no build step)
@@ -50,3 +57,5 @@ Track completion logs for Scottish and English hill lists:
 
 ## Database
 `walks.db` is created automatically on first run. It is backed up to `walks.db.bak` on every startup.
+
+`walks_template.db` is a reference database (Finlay Wild splits + personal attempt splits for key routes) used as a starting point on new installs.

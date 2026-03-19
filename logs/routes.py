@@ -1,4 +1,6 @@
+import csv
 import datetime
+import io
 
 from flask import render_template, request, redirect, url_for, flash, jsonify, Response
 from werkzeug.wrappers import Response as WerkzeugResponse
@@ -256,6 +258,98 @@ def _update_entry(entry: LogEntry) -> WerkzeugResponse:
 
     db.session.commit()
     flash('Entry updated.', 'success')
+    return redirect(url_for('logs.year_view', year=year))
+
+
+@bp.route('/import', methods=['GET', 'POST'])
+def import_csv() -> str | WerkzeugResponse:
+    available_years = [
+        row.year for row in
+        db.session.query(LogEntry.year).distinct().order_by(LogEntry.year.desc()).all()
+    ]
+    # Always include current year
+    if CURRENT_YEAR not in available_years:
+        available_years = sorted(set(available_years + [CURRENT_YEAR]), reverse=True)
+
+    if request.method == 'GET':
+        return render_template('logs/import.html', available_years=available_years,
+                               current_year=CURRENT_YEAR)
+
+    year_raw = request.form.get('year', '').strip()
+    csv_text = request.form.get('csv_data', '').strip()
+
+    try:
+        year = int(year_raw)
+    except ValueError:
+        flash('Please select a year.', 'error')
+        return render_template('logs/import.html', available_years=available_years,
+                               current_year=CURRENT_YEAR)
+
+    if not csv_text:
+        flash('No CSV data provided.', 'error')
+        return render_template('logs/import.html', available_years=available_years,
+                               current_year=CURRENT_YEAR)
+
+    reader = csv.DictReader(io.StringIO(csv_text))
+    imported = skipped = 0
+    errors: list[str] = []
+
+    for i, row in enumerate(reader, start=2):
+        date_str = (row.get('date') or '').strip()
+        if not date_str:
+            continue
+        try:
+            datetime.date.fromisoformat(date_str)
+        except ValueError:
+            errors.append(f'Row {i}: invalid date {repr(date_str)} — skipped')
+            skipped += 1
+            continue
+
+        def _si(key: str) -> int | None:
+            v = (row.get(key) or '').strip()
+            try:
+                return int(float(v)) if v else None
+            except ValueError:
+                return None
+
+        def _sf(key: str) -> float | None:
+            v = (row.get(key) or '').strip()
+            try:
+                return float(v) if v else None
+            except ValueError:
+                return None
+
+        def _st(key: str) -> str | None:
+            v = (row.get(key) or '').strip()
+            return v or None
+
+        act = (_st('activity_type') or '').lower()
+        activity_type = act if act in ('walk', 'run', 'cycle') else None
+
+        entry = LogEntry(
+            year=year,
+            date=date_str,
+            date_display=date_str,
+            distance_km=_sf('distance_km'),
+            ascent_m=_si('ascent_m'),
+            activity_type=activity_type,
+            with_whom=_st('with_whom'),
+            region=_st('region'),
+            notes=_st('notes'),
+            hills_text=_st('hills_text'),
+            corbetts_count=_si('corbetts_count') or 0,
+            munros_count=_si('munros_count') or 0,
+            wainwrights_count=_si('wainwrights_count') or 0,
+            rating=_si('rating'),
+        )
+        db.session.add(entry)
+        imported += 1
+
+    db.session.commit()
+
+    for e in errors:
+        flash(e, 'error')
+    flash(f'Imported {imported} entries for {year}' + (f' ({skipped} skipped).' if skipped else '.'), 'success')
     return redirect(url_for('logs.year_view', year=year))
 
 
