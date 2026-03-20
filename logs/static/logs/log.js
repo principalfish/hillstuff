@@ -2,7 +2,8 @@
     'use strict';
 
     var typeSelect = document.getElementById('hill-type-select');
-    var nameSelect = document.getElementById('hill-name-select');
+    var hillSearch = document.getElementById('hill-search');
+    var hillDropdown = document.getElementById('hill-dropdown');
     var addBtn = document.getElementById('add-hill-btn');
     var listDiv = document.getElementById('linked-hills-list');
     var munrosInput = document.getElementById('munros_count');
@@ -12,53 +13,98 @@
     if (!typeSelect) return;
 
     var linkedHills = (typeof INITIAL_HILLS !== 'undefined') ? INITIAL_HILLS.slice() : [];
+    var allHills = [];
+    var selectedHill = null;
 
     // Render any pre-existing hills (edit form)
     if (linkedHills.length) render();
 
+    function showDropdown(items) {
+        hillDropdown.innerHTML = '';
+        if (!items.length) {
+            hillDropdown.style.display = 'none';
+            return;
+        }
+        items.forEach(function (h) {
+            var item = document.createElement('div');
+            item.style.cssText = 'padding:0.3rem 0.5rem;cursor:pointer';
+            item.textContent = h.name + ' (' + h.height_m + 'm, ' + h.region + ')';
+            item.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                selectedHill = h;
+                hillSearch.value = h.name + ' (' + h.height_m + 'm, ' + h.region + ')';
+                hillDropdown.style.display = 'none';
+                addBtn.disabled = false;
+            });
+            item.addEventListener('mouseover', function () { item.style.background = '#eee'; });
+            item.addEventListener('mouseout', function () { item.style.background = ''; });
+            hillDropdown.appendChild(item);
+        });
+        hillDropdown.style.display = 'block';
+    }
+
     typeSelect.addEventListener('change', function () {
         var hillType = typeSelect.value;
-        nameSelect.innerHTML = '<option value="">Loading...</option>';
-        nameSelect.disabled = true;
+        allHills = [];
+        selectedHill = null;
+        hillSearch.value = '';
+        hillSearch.placeholder = 'Search hills…';
+        hillDropdown.style.display = 'none';
         addBtn.disabled = true;
 
         if (!hillType) {
-            nameSelect.innerHTML = '<option value="">— choose hill —</option>';
+            hillSearch.disabled = true;
             return;
         }
+
+        hillSearch.disabled = true;
+        hillSearch.placeholder = 'Loading…';
 
         fetch('/logs/api/hills/' + hillType)
             .then(function (r) { return r.json(); })
             .then(function (hills) {
-                nameSelect.innerHTML = '<option value="">— choose hill —</option>';
-                hills.forEach(function (h) {
-                    var opt = document.createElement('option');
-                    opt.value = h.id;
-                    opt.dataset.name = h.name;
-                    opt.textContent = h.name + ' (' + h.height_m + 'm, ' + h.region + ')';
-                    nameSelect.appendChild(opt);
-                });
-                nameSelect.disabled = false;
-                // Make the name select searchable by size
-                nameSelect.size = 1;
+                allHills = hills;
+                hillSearch.disabled = false;
+                hillSearch.placeholder = 'Search hills…';
+                hillSearch.focus();
             })
             .catch(function () {
-                nameSelect.innerHTML = '<option value="">Error loading</option>';
+                hillSearch.placeholder = 'Error loading';
             });
     });
 
-    nameSelect.addEventListener('change', function () {
-        addBtn.disabled = !nameSelect.value;
+    hillSearch.addEventListener('input', function () {
+        selectedHill = null;
+        addBtn.disabled = true;
+        var q = hillSearch.value.toLowerCase().trim();
+        if (!q) {
+            hillDropdown.style.display = 'none';
+            return;
+        }
+        var matches = allHills.filter(function (h) {
+            return h.name.toLowerCase().indexOf(q) !== -1 ||
+                   h.region.toLowerCase().indexOf(q) !== -1;
+        });
+        showDropdown(matches.slice(0, 20));
+    });
+
+    hillSearch.addEventListener('blur', function () {
+        hillDropdown.style.display = 'none';
+    });
+
+    hillSearch.addEventListener('focus', function () {
+        if (hillSearch.value.trim() && !selectedHill) {
+            hillSearch.dispatchEvent(new Event('input'));
+        }
     });
 
     addBtn.addEventListener('click', function () {
-        var id = parseInt(nameSelect.value, 10);
-        var selected = nameSelect.options[nameSelect.selectedIndex];
-        var name = selected.dataset.name || selected.textContent;
-        var type = typeSelect.value;
-        if (!id) return;
-        if (linkedHills.some(function (h) { return h.id === id; })) return;
-        linkedHills.push({ id: id, name: name, type: type });
+        if (!selectedHill) return;
+        if (linkedHills.some(function (h) { return h.id === selectedHill.id; })) return;
+        linkedHills.push({ id: selectedHill.id, name: selectedHill.name, type: typeSelect.value });
+        selectedHill = null;
+        hillSearch.value = '';
+        addBtn.disabled = true;
         render();
     });
 

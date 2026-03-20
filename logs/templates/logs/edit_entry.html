@@ -61,9 +61,10 @@
             <option value="corbett">Corbett</option>
             <option value="wainwright">Wainwright</option>
         </select>
-        <select id="hill-name-select" style="width:16rem" disabled>
-            <option value="">— choose hill —</option>
-        </select>
+        <div style="position:relative">
+            <input type="text" id="hill-search" placeholder="Search hills…" style="width:16rem" disabled autocomplete="off">
+            <div id="hill-dropdown" style="display:none;position:absolute;top:100%;left:0;width:100%;max-height:12rem;overflow-y:auto;background:#fff;border:1px solid #ccc;border-top:none;z-index:100"></div>
+        </div>
         <button type="button" class="btn" id="add-hill-btn" disabled>Add</button>
     </div>
     <div id="linked-hills-list" style="margin-bottom:1rem"></div>
