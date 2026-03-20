@@ -42,8 +42,8 @@ class PaceTier(db.Model):
     route_id = db.Column(db.Integer, db.ForeignKey('routes.id', ondelete='CASCADE'), nullable=False)
     up_to_minutes = db.Column(db.Float, nullable=True)
     flat_pace_min_per_km = db.Column(db.Float, nullable=False)
-    ascent_pace_min_per_150m = db.Column(db.Float, nullable=False, default=0)
-    descent_pace_min_per_450m = db.Column(db.Float, nullable=False, default=0)
+    ascent_pace = db.Column(db.Float, nullable=False, default=0)
+    descent_pace = db.Column(db.Float, nullable=False, default=0)
 
 
 class TimeOverride(db.Model):

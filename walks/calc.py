@@ -53,8 +53,8 @@ def calculate_leg_times(
         if tier:
             calc_time = (
                 leg['distance_km'] * tier['flat_pace_min_per_km']
-                + leg['ascent_m'] / 150.0 * tier['ascent_pace_min_per_150m']
-                + leg['descent_m'] / 450.0 * tier['descent_pace_min_per_450m']
+                + leg['ascent_m'] / 125.0 * tier['ascent_pace']
+                + leg['descent_m'] / 500.0 * tier['descent_pace']
             )
         else:
             calc_time = 0.0

@@ -8,8 +8,8 @@ from walks.calc import (
 
 def test_get_tier_first_tier() -> None:
     tiers = [
-        {'up_to_minutes': 120, 'flat_pace_min_per_km': 5.0, 'ascent_pace_min_per_150m': 5.0, 'descent_pace_min_per_450m': 5.0},
-        {'up_to_minutes': None, 'flat_pace_min_per_km': 7.0, 'ascent_pace_min_per_150m': 7.0, 'descent_pace_min_per_450m': 7.0},
+        {'up_to_minutes': 120, 'flat_pace_min_per_km': 5.0, 'ascent_pace': 5.0, 'descent_pace': 5.0},
+        {'up_to_minutes': None, 'flat_pace_min_per_km': 7.0, 'ascent_pace': 7.0, 'descent_pace': 7.0},
     ]
     idx, tier = get_tier_for_time(tiers, 60)
     assert idx == 0
@@ -18,8 +18,8 @@ def test_get_tier_first_tier() -> None:
 
 def test_get_tier_second_tier() -> None:
     tiers = [
-        {'up_to_minutes': 120, 'flat_pace_min_per_km': 5.0, 'ascent_pace_min_per_150m': 5.0, 'descent_pace_min_per_450m': 5.0},
-        {'up_to_minutes': None, 'flat_pace_min_per_km': 7.0, 'ascent_pace_min_per_150m': 7.0, 'descent_pace_min_per_450m': 7.0},
+        {'up_to_minutes': 120, 'flat_pace_min_per_km': 5.0, 'ascent_pace': 5.0, 'descent_pace': 5.0},
+        {'up_to_minutes': None, 'flat_pace_min_per_km': 7.0, 'ascent_pace': 7.0, 'descent_pace': 7.0},
     ]
     idx, tier = get_tier_for_time(tiers, 150)
     assert idx == 1
@@ -34,8 +34,8 @@ def test_get_tier_empty() -> None:
 
 def test_get_tier_boundary() -> None:
     tiers = [
-        {'up_to_minutes': 120, 'flat_pace_min_per_km': 5.0, 'ascent_pace_min_per_150m': 5.0, 'descent_pace_min_per_450m': 5.0},
-        {'up_to_minutes': None, 'flat_pace_min_per_km': 7.0, 'ascent_pace_min_per_150m': 7.0, 'descent_pace_min_per_450m': 7.0},
+        {'up_to_minutes': 120, 'flat_pace_min_per_km': 5.0, 'ascent_pace': 5.0, 'descent_pace': 5.0},
+        {'up_to_minutes': None, 'flat_pace_min_per_km': 7.0, 'ascent_pace': 7.0, 'descent_pace': 7.0},
     ]
     # Exactly at boundary should move to next tier
     idx, tier = get_tier_for_time(tiers, 120)
@@ -50,7 +50,7 @@ def test_calculate_leg_times_basic() -> None:
         {'id': 2, 'leg_num': 2, 'location': 'CP1', 'distance_km': 10.0, 'ascent_m': 0, 'descent_m': 0, 'notes': ''},
     ]
     tiers = [
-        {'up_to_minutes': None, 'flat_pace_min_per_km': 6.0, 'ascent_pace_min_per_150m': 0, 'descent_pace_min_per_450m': 0},
+        {'up_to_minutes': None, 'flat_pace_min_per_km': 6.0, 'ascent_pace': 0, 'descent_pace': 0},
     ]
     result = calculate_leg_times(legs, tiers)
     assert result[0]['time'] == 0.0
@@ -65,11 +65,11 @@ def test_calculate_leg_times_with_ascent() -> None:
         {'id': 2, 'leg_num': 2, 'location': 'Summit', 'distance_km': 5.0, 'ascent_m': 300, 'descent_m': 0},
     ]
     tiers = [
-        {'up_to_minutes': None, 'flat_pace_min_per_km': 6.0, 'ascent_pace_min_per_150m': 5.0, 'descent_pace_min_per_450m': 0},
+        {'up_to_minutes': None, 'flat_pace_min_per_km': 6.0, 'ascent_pace': 5.0, 'descent_pace': 0},
     ]
     result = calculate_leg_times(legs, tiers)
-    # 5km * 6min + 300m / 150m * 5min = 30 + 10 = 40
-    assert result[1]['time'] == 40.0
+    # 5km * 6min + 300m / 125m * 5min = 30 + 12 = 42
+    assert result[1]['time'] == 42.0
 
 
 def test_calculate_leg_times_with_override() -> None:
@@ -78,7 +78,7 @@ def test_calculate_leg_times_with_override() -> None:
         {'id': 2, 'leg_num': 2, 'location': 'CP1', 'distance_km': 10.0, 'ascent_m': 0, 'descent_m': 0},
     ]
     tiers = [
-        {'up_to_minutes': None, 'flat_pace_min_per_km': 6.0, 'ascent_pace_min_per_150m': 0, 'descent_pace_min_per_450m': 0},
+        {'up_to_minutes': None, 'flat_pace_min_per_km': 6.0, 'ascent_pace': 0, 'descent_pace': 0},
     ]
     result = calculate_leg_times(legs, tiers, overrides={2: 45.0})
     assert result[1]['calc_time'] == 60.0
@@ -92,7 +92,7 @@ def test_calculate_leg_times_with_start_time() -> None:
         {'id': 2, 'leg_num': 2, 'location': 'CP1', 'distance_km': 10.0, 'ascent_m': 0, 'descent_m': 0},
     ]
     tiers = [
-        {'up_to_minutes': None, 'flat_pace_min_per_km': 6.0, 'ascent_pace_min_per_150m': 0, 'descent_pace_min_per_450m': 0},
+        {'up_to_minutes': None, 'flat_pace_min_per_km': 6.0, 'ascent_pace': 0, 'descent_pace': 0},
     ]
     result = calculate_leg_times(legs, tiers, start_time_minutes=360)  # 06:00
     assert result[0]['time_of_day'] == 360.0  # arrives at start at 06:00

@@ -34,7 +34,8 @@
                 hills.forEach(function (h) {
                     var opt = document.createElement('option');
                     opt.value = h.id;
-                    opt.textContent = h.name;
+                    opt.dataset.name = h.name;
+                    opt.textContent = h.name + ' (' + h.height_m + 'm, ' + h.region + ')';
                     nameSelect.appendChild(opt);
                 });
                 nameSelect.disabled = false;
@@ -52,7 +53,8 @@
 
     addBtn.addEventListener('click', function () {
         var id = parseInt(nameSelect.value, 10);
-        var name = nameSelect.options[nameSelect.selectedIndex].textContent;
+        var selected = nameSelect.options[nameSelect.selectedIndex];
+        var name = selected.dataset.name || selected.textContent;
         var type = typeSelect.value;
         if (!id) return;
         if (linkedHills.some(function (h) { return h.id === id; })) return;

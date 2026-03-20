@@ -361,4 +361,4 @@ def api_hills(hill_type: str) -> Response:
              .filter_by(hill_type=hill_type)
              .order_by(Hill.name.asc())
              .all())
-    return jsonify([{'id': h.id, 'name': h.name} for h in hills])
+    return jsonify([{'id': h.id, 'name': h.name, 'height_m': h.height_m, 'region': h.region} for h in hills])
