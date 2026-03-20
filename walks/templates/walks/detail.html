@@ -8,6 +8,8 @@
 {% for tier in pace_tiers %}
 .pace-tier-{{ loop.index0 }} { background-color: {{ tier_colors[loop.index0] if loop.index0 < tier_colors|length else tier_colors[-1] }} !important; }
 {% endfor %}
+.override-cell { white-space: nowrap; }
+.override-clear { margin-left: 2px; vertical-align: middle; }
 </style>
 {% endblock %}
 
@@ -152,11 +154,12 @@
                 <td>{{ format_time(leg.time) }}</td>
                 <td>{{ format_time(leg.cumulative_time) }}</td>
                 {% if route.start_time %}<td>{{ format_time_of_day(leg.time_of_day) }}</td>{% endif %}
-                <td>
+                <td class="override-cell">
                     <input type="number" step="0.1" name="override_{{ leg.id }}"
                            value="{{ leg.override if leg.override is not none else '' }}"
                            placeholder="{{ '%.1f' | format(leg.calc_time) }}"
                            class="override-input">
+                    {% if leg.override is not none %}<button type="button" class="btn btn-small btn-danger override-clear" onclick="this.previousElementSibling.value=''" title="Clear override">×</button>{% endif %}
                 </td>
                 <td><input type="text" name="notes_{{ leg.id }}" value="{{ leg.notes }}" class="notes-input-inline" placeholder="notes"></td>
             </tr>
