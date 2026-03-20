@@ -92,7 +92,7 @@
             </thead>
             <tbody id="pace-body">
                 {% for tier in pace_tiers %}
-                <tr>
+                <tr class="pace-tier-{{ loop.index0 }}">
                     <td><input type="number" step="1" name="up_to_{{ loop.index0 }}" value="{{ tier.up_to_minutes|default('', true) }}" placeholder="∞"></td>
                     <td><input type="number" step="0.1" name="flat_pace_{{ loop.index0 }}" value="{{ tier.flat_pace_min_per_km }}" required></td>
                     <td><input type="number" step="0.1" name="ascent_pace_{{ loop.index0 }}" value="{{ tier.ascent_pace_min_per_150m }}" required></td>
