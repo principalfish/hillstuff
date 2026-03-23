@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pyrenees Peaks</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+
+    #toolbar {
+      padding: 8px 12px;
+      background: #1e1e1e;
+      color: #eee;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      z-index: 1000;
+    }
+    #toolbar label { font-size: 0.85em; color: #aaa; }
+    #file-input { font-size: 0.85em; color: #eee; }
+    #btn-clear-poly, #btn-download-poly {
+      padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.82em;
+    }
+    #btn-clear-poly   { background: #555; color: #eee; }
+    #btn-download-poly { background: #2a7; color: #fff; }
+    #btn-clear-poly:disabled, #btn-download-poly:disabled { opacity: 0.35; cursor: default; }
+    #csv-select {
+      padding: 5px 8px;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #333;
+      color: #eee;
+      min-width: 180px;
+    }
+    #status { font-size: 0.8em; color: #888; }
+
+    #legend {
+      margin-left: auto;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-size: 0.75em;
+      flex-wrap: wrap;
+    }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .legend-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.3);
+      flex-shrink: 0;
+    }
+
+    #main { display: flex; flex: 1; overflow: hidden; }
+    #map { flex: 1; }
+
+    #sidebar {
+      width: 260px;
+      background: #1a1a1a;
+      color: #ddd;
+      overflow-y: auto;
+      flex-shrink: 0;
+      border-left: 1px solid #333;
+    }
+    #sidebar-list { list-style: none; }
+    .hill-item {
+      display: flex;
+      align-items: stretch;
+      border-bottom: 1px solid #2a2a2a;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .hill-item:hover { background: #2a2a2a; }
+    .hill-item.active { background: #2e2e2e; }
+    .hill-color-bar { width: 5px; flex-shrink: 0; }
+    .hill-info { padding: 7px 10px; flex: 1; min-width: 0; }
+    .hill-name { font-size: 0.85em; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hill-rank { color: #666; font-weight: 400; margin-right: 4px; }
+    .hill-stats { font-size: 0.75em; color: #888; margin-top: 2px; }
+    .hill-stats span { margin-right: 8px; }
+    .hill-stats .prom { color: #aaa; }
+
+    .peak-popup { min-width: 180px; }
+    .peak-popup h3 { margin-bottom: 6px; font-size: 1em; }
+    .peak-popup table { border-collapse: collapse; width: 100%; font-size: 0.9em; }
+    .peak-popup td { padding: 2px 6px 2px 0; }
+    .peak-popup td:first-child { color: #666; white-space: nowrap; }
+    .peak-popup a { color: #0078a8; }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <select id="csv-select"><option value="">— select dataset —</option></select>
+  <span id="status"></span>
+  <button id="btn-clear-poly" disabled>Clear polygon</button>
+  <button id="btn-download-poly" disabled>Download filtered CSV</button>
+  <div id="legend"></div>
+</div>
+<div id="main">
+  <div id="map"></div>
+  <div id="sidebar">
+    <ul id="sidebar-list"></ul>
+  </div>
+</div>
+
+<script>
+const BAND_COLORS = [
+  '#00aa00', '#66cc00', '#ccdd00', '#ffee00',
+  '#ffaa00', '#ff5500', '#ff0000', '#880000',
+];
+
+let BANDS = [];
+
+function updateBands(rows) {
+  const elevs = rows.map(p => parseFloat(p.elevation_m)).filter(e => !isNaN(e));
+  if (!elevs.length) return;
+  const minE = elevs.reduce((a, b) => Math.min(a, b), Infinity);
+  const maxE = elevs.reduce((a, b) => Math.max(a, b), -Infinity);
+  const base = Math.floor(minE / 500) * 500;
+  const top  = Math.ceil(maxE / 500) * 500;
+  const step = Math.max(500, Math.round((top - base) / 8 / 500) * 500);
+
+  BANDS = BAND_COLORS.map((color, i) => {
+    const lo = base + i * step;
+    const hi = i < 7 ? base + (i + 1) * step : Infinity;
+    const label = i < 7 ? `${lo}–${hi}m` : `${lo}m+`;
+    return { max: hi, color, label };
+  });
+
+  const legend = document.getElementById('legend');
+  legend.innerHTML = '';
+  BANDS.forEach(b => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="legend-dot" style="background:${b.color}"></div>${b.label}`;
+    legend.appendChild(item);
+  });
+}
+
+function colorForEle(ele) {
+  const e = parseFloat(ele) || 0;
+  return (BANDS.find(b => e < b.max) || BANDS.at(-1) || { color: '#888' }).color;
+}
+
+// Map
+const map = L.map('map').setView([42.7, 1.0], 8);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '© <a href="https://www.esri.com/">Esri</a>',
+  maxZoom: 18,
+}).addTo(map);
+
+// Polygon filter state
+let drawnPoly   = null;
+let polyLayer   = new L.FeatureGroup().addTo(map);
+let filteredRows = null;   // rows inside current polygon
+
+const drawControl = new L.Control.Draw({
+  draw:   { polygon: { shapeOptions: { color: '#ff9900', weight: 2 } },
+            polyline: false, rectangle: false, circle: false,
+            circlemarker: false, marker: false },
+  edit:   { featureGroup: polyLayer, remove: false },
+});
+map.addControl(drawControl);
+
+function pointInPoly(lat, lon, latlngs) {
+  let inside = false;
+  for (let i = 0, j = latlngs.length - 1; i < latlngs.length; j = i++) {
+    const xi = latlngs[i].lat, yi = latlngs[i].lng;
+    const xj = latlngs[j].lat, yj = latlngs[j].lng;
+    if (((yi > lon) !== (yj > lon)) &&
+        (lat < (xj - xi) * (lon - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+map.on(L.Draw.Event.CREATED, e => {
+  if (drawnPoly) polyLayer.removeLayer(drawnPoly);
+  drawnPoly = e.layer;
+  polyLayer.addLayer(drawnPoly);
+  applyPolyFilter();
+});
+
+map.on(L.Draw.Event.EDITED, () => applyPolyFilter());
+
+function applyPolyFilter() {
+  if (!drawnPoly) return;
+  const latlngs = drawnPoly.getLatLngs()[0];
+  const name = document.getElementById('csv-select').value;
+  const rows = datasets[name] || [];
+  filteredRows = rows.filter(p => {
+    const lat = parseFloat(p.lat), lon = parseFloat(p.lon);
+    return !isNaN(lat) && !isNaN(lon) && pointInPoly(lat, lon, latlngs);
+  });
+  document.getElementById('status').textContent =
+    `${filteredRows.length} of ${rows.length} peaks in polygon`;
+  document.getElementById('btn-clear-poly').disabled   = false;
+  document.getElementById('btn-download-poly').disabled = false;
+  // Highlight sidebar items inside polygon
+  document.querySelectorAll('.hill-item').forEach(li => {
+    const lat = parseFloat(li.dataset.lat), lon = parseFloat(li.dataset.lon);
+    li.style.opacity = (!isNaN(lat) && pointInPoly(lat, lon, latlngs)) ? '1' : '0.25';
+  });
+}
+
+document.getElementById('btn-clear-poly').addEventListener('click', () => {
+  if (drawnPoly) { polyLayer.removeLayer(drawnPoly); drawnPoly = null; }
+  filteredRows = null;
+  document.getElementById('btn-clear-poly').disabled   = true;
+  document.getElementById('btn-download-poly').disabled = true;
+  document.querySelectorAll('.hill-item').forEach(li => li.style.opacity = '1');
+  const name = document.getElementById('csv-select').value;
+  document.getElementById('status').textContent =
+    `${(datasets[name] || []).length} peaks`;
+});
+
+document.getElementById('btn-download-poly').addEventListener('click', () => {
+  if (!filteredRows || !filteredRows.length) return;
+  const csv = Papa.unparse(filteredRows);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = 'peaks_filtered.csv';
+  a.click();
+});
+
+// State
+const datasets = {};
+let currentLayer = null;
+let activeItem = null;
+
+function renderDataset(name) {
+  if (currentLayer) map.removeLayer(currentLayer);
+  const rows = [...(datasets[name] || [])].sort((a, b) =>
+    (parseFloat(b.elevation_m) || 0) - (parseFloat(a.elevation_m) || 0)
+  );
+  if (!rows.length) return;
+
+  updateBands(rows);
+  const layer = L.layerGroup();
+  const sidebarList = document.getElementById('sidebar-list');
+  sidebarList.innerHTML = '';
+  let count = 0;
+
+  rows.forEach(p => {
+    const lat = parseFloat(p.lat);
+    const lon = parseFloat(p.lon);
+    if (isNaN(lat) || isNaN(lon)) return;
+    count++;
+
+    const ele = parseFloat(p.elevation_m) || 0;
+    const prom = p.prominence ? parseFloat(p.prominence) : null;
+    const promCalc = p.prominence_calc ? parseFloat(p.prominence_calc) : null;
+    const peakName = p.name || p.name_en || p.name_fr || '(unnamed)';
+    const color = colorForEle(ele);
+
+    const marker = L.circleMarker([lat, lon], {
+      radius: 6,
+      color: '#fff',
+      weight: 1,
+      fillColor: color,
+      fillOpacity: 0.9,
+    });
+
+    const altNames = [];
+    if (p.name_en && p.name_en !== peakName) altNames.push(`<tr><td>EN</td><td>${p.name_en}</td></tr>`);
+    if (p.name_fr && p.name_fr !== peakName) altNames.push(`<tr><td>FR</td><td>${p.name_fr}</td></tr>`);
+    if (p.name_es && p.name_es !== peakName) altNames.push(`<tr><td>ES</td><td>${p.name_es}</td></tr>`);
+    const wikiLink = p.wikipedia
+      ? `<tr><td>Wikipedia</td><td><a href="https://en.wikipedia.org/wiki/${encodeURIComponent(p.wikipedia.replace(/^\w+:/, ''))}" target="_blank">${p.wikipedia}</a></td></tr>`
+      : '';
+
+    marker.bindPopup(`
+      <div class="peak-popup">
+        <h3>${peakName}</h3>
+        <table>
+          <tr><td>Elevation</td><td><b>${ele ? Math.round(ele) + 'm' : '?'}</b></td></tr>
+          ${prom !== null ? `<tr><td>Prominence (OSM)</td><td>${Math.round(prom)}m</td></tr>` : ''}
+          ${promCalc !== null ? `<tr><td>Prominence (calc)</td><td><b>${Math.round(promCalc)}m</b></td></tr>` : ''}
+          ${altNames.join('')}
+          ${wikiLink}
+        </table>
+      </div>
+    `);
+
+    // Sidebar item
+    const li = document.createElement('li');
+    li.className = 'hill-item';
+    li.dataset.lat = lat;
+    li.dataset.lon = lon;
+    li.innerHTML = `
+      <div class="hill-color-bar" style="background:${color}"></div>
+      <div class="hill-info">
+        <div class="hill-name"><span class="hill-rank">${count}</span> ${peakName}</div>
+        <div class="hill-stats">
+          <span>${ele ? Math.round(ele) + 'm' : '?'}</span>
+          ${promCalc !== null ? `<span class="prom">P ${Math.round(promCalc)}m</span>` : ''}
+          ${prom !== null ? `<span class="prom" style="color:#666">P ${Math.round(prom)}m osm</span>` : ''}
+        </div>
+      </div>
+    `;
+    li.addEventListener('click', () => {
+      if (activeItem) activeItem.classList.remove('active');
+      li.classList.add('active');
+      activeItem = li;
+      map.setView([lat, lon], Math.max(map.getZoom(), 11));
+      marker.openPopup();
+    });
+    marker.on('click', () => {
+      if (activeItem) activeItem.classList.remove('active');
+      li.classList.add('active');
+      activeItem = li;
+      li.scrollIntoView({ block: 'nearest' });
+    });
+    sidebarList.appendChild(li);
+
+    layer.addLayer(marker);
+  });
+
+  layer.addTo(map);
+  currentLayer = layer;
+  document.getElementById('status').textContent = `${count} peaks`;
+
+  const coords = rows
+    .map(p => [parseFloat(p.lat), parseFloat(p.lon)])
+    .filter(([a, b]) => !isNaN(a) && !isNaN(b));
+  if (coords.length) map.fitBounds(coords, { padding: [30, 30] });
+}
+
+// Populate dropdown from server
+const select = document.getElementById('csv-select');
+
+fetch('/api/csvs')
+  .then(r => r.json())
+  .then(csvs => {
+    csvs.forEach((name, i) => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      select.appendChild(opt);
+      if (i === 0) {
+        select.value = name;
+        loadAndRender(name);
+      }
+    });
+    if (!csvs.length) {
+      document.getElementById('status').textContent = 'No CSVs found in directory.';
+    }
+  })
+  .catch(() => {
+    document.getElementById('status').textContent = 'Run serve.py to load CSVs automatically.';
+  });
+
+function loadAndRender(name) {
+  if (datasets[name]) { renderDataset(name); return; }
+  fetch(name)
+    .then(r => r.text())
+    .then(text => {
+      datasets[name] = Papa.parse(text, { header: true, skipEmptyLines: true }).data;
+      renderDataset(name);
+    });
+}
+
+select.addEventListener('change', function() {
+  if (this.value) loadAndRender(this.value);
+});
+</script>
+</body>
+</html>

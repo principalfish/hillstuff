@@ -8,3 +8,6 @@ walks_test.db
 walks - Copy.db
 
 old_data/*
+
+misc-scripts/dem_cache/*
+misc-scripts/dem_cache_kgz/*
