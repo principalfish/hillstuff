@@ -261,6 +261,22 @@ def _update_entry(entry: LogEntry) -> WerkzeugResponse:
     return redirect(url_for('logs.year_view', year=year))
 
 
+@bp.route('/<int:year>/<int:entry_id>/delete', methods=['POST'])
+def delete_entry(year: int, entry_id: int) -> WerkzeugResponse:
+    entry = LogEntry.query.filter_by(id=entry_id, year=year).first_or_404()
+
+    linked_hill_ids = [leh.hill_id for leh in LogEntryHill.query.filter_by(log_entry_id=entry.id).all()]
+    if linked_hill_ids:
+        (HillAscent.query
+         .filter(HillAscent.hill_id.in_(linked_hill_ids), HillAscent.date == entry.date)
+         .delete(synchronize_session=False))
+    LogEntryHill.query.filter_by(log_entry_id=entry.id).delete()
+    db.session.delete(entry)
+    db.session.commit()
+    flash('Entry deleted.', 'success')
+    return redirect(url_for('logs.year_view', year=year))
+
+
 @bp.route('/import', methods=['GET', 'POST'])
 def import_csv() -> str | WerkzeugResponse:
     available_years = [

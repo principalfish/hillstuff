@@ -105,7 +105,12 @@
                 <td>{{ e.wainwrights_count or '' }}</td>
                 <td>{{ e.rating or '' }}</td>
                 <td class="notes-cell">{{ e.notes or '' }}</td>
-                <td><a href="{{ url_for('logs.edit_entry', year=year, entry_id=e.id) }}" class="btn btn-small">Edit</a></td>
+                <td style="white-space:nowrap">
+                    <a href="{{ url_for('logs.edit_entry', year=year, entry_id=e.id) }}" class="btn btn-small">Edit</a>
+                    <form method="post" action="{{ url_for('logs.delete_entry', year=year, entry_id=e.id) }}" style="display:inline" onsubmit="return confirm('Delete this entry?')">
+                        <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                    </form>
+                </td>
             </tr>
             {% endfor %}
         </tbody>
