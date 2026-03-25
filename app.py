@@ -2,7 +2,7 @@ import shutil
 import os
 import datetime
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 
 from walks import db
 import walks.models  # noqa: F401 — registers models with SQLAlchemy
@@ -43,6 +43,12 @@ def create_app(test_config: dict | None = None) -> Flask:
     with app.app_context():
         db.init_db()
 
+    @app.after_request
+    def sync_db_after_write(response):
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            db.sync_to_windows()
+        return response
+
     from walks import bp as walks_bp
     app.register_blueprint(walks_bp, url_prefix='/bigruns')
 
@@ -62,4 +68,5 @@ def create_app(test_config: dict | None = None) -> Flask:
 if __name__ == '__main__':
     app = create_app()
     print(f'Database: {os.path.abspath(db.DATABASE)}')
+    db.sync_to_windows()
     app.run(debug=True)
