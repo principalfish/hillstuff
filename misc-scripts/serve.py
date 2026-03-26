@@ -19,7 +19,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 class Handler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path == "/api/csvs":
-            csvs = sorted(os.path.basename(f) for f in glob.glob(os.path.join(SCRIPT_DIR, "*.csv")))
+            csvs = sorted(
+                os.path.basename(f) for f in glob.glob(os.path.join(SCRIPT_DIR, "*.csv"))
+                if os.path.basename(f) != "pyrenees_food_shops.csv"
+            )
             body = json.dumps(csvs).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

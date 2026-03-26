@@ -30,6 +30,20 @@
     #btn-clear-poly   { background: #555; color: #eee; }
     #btn-download-poly { background: #2a7; color: #fff; }
     #btn-clear-poly:disabled, #btn-download-poly:disabled { opacity: 0.35; cursor: default; }
+    #btn-food-shops {
+      padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.82em;
+      background: #444; color: #bbb;
+    }
+    #btn-food-shops.on { background: #2a7; color: #fff; }
+
+    #food-legend {
+      display: none;
+      gap: 8px;
+      align-items: center;
+      font-size: 0.75em;
+      flex-wrap: wrap;
+    }
+    #food-legend.visible { display: flex; }
     #csv-select {
       padding: 5px 8px;
       border-radius: 4px;
@@ -98,8 +112,10 @@
 <div id="toolbar">
   <select id="csv-select"><option value="">— select dataset —</option></select>
   <span id="status"></span>
+  <button id="btn-food-shops">Food shops: OFF</button>
   <button id="btn-clear-poly" disabled>Clear polygon</button>
   <button id="btn-download-poly" disabled>Download filtered CSV</button>
+  <div id="food-legend"></div>
   <div id="legend"></div>
 </div>
 <div id="main">
@@ -367,6 +383,90 @@ function loadAndRender(name) {
 
 select.addEventListener('change', function() {
   if (this.value) loadAndRender(this.value);
+});
+
+// ── Food shops overlay ─────────────────────────────────────────────────────
+
+const FOOD_ICON = L.divIcon({
+  html: '<div style="width:10px;height:10px;background:#f39c12;border:2px solid #fff;border-radius:2px;box-shadow:0 1px 3px rgba(0,0,0,0.5)"></div>',
+  className: '',
+  iconSize: [10, 10],
+  iconAnchor: [5, 5],
+  popupAnchor: [0, -8],
+});
+
+let foodShopsLayer = null;
+let foodShopsData = null;
+let foodShopsOn = false;
+
+function renderFoodShops(rows) {
+  if (foodShopsLayer) map.removeLayer(foodShopsLayer);
+  const layer = L.layerGroup();
+
+  rows.forEach(p => {
+    const lat = parseFloat(p.lat);
+    const lon = parseFloat(p.lon);
+    if (isNaN(lat) || isNaN(lon)) return;
+    const name = p.name || p.brand || '(unnamed)';
+
+    const marker = L.marker([lat, lon], { icon: FOOD_ICON });
+
+    const brandRow = (p.brand && p.brand !== name) ? `<tr><td>Brand</td><td>${p.brand}</td></tr>` : '';
+    const hoursRow = p.opening_hours ? `<tr><td>Hours</td><td>${p.opening_hours}</td></tr>` : '';
+    const webRow   = p.website ? `<tr><td>Web</td><td><a href="${p.website}" target="_blank">link</a></td></tr>` : '';
+    const phoneRow = p.phone ? `<tr><td>Phone</td><td>${p.phone}</td></tr>` : '';
+
+    marker.bindPopup(`
+      <div class="peak-popup">
+        <h3>${name}</h3>
+        <table>
+          <tr><td>Type</td><td>${p.shop}</td></tr>
+          ${brandRow}${hoursRow}${webRow}${phoneRow}
+        </table>
+      </div>
+    `);
+    layer.addLayer(marker);
+  });
+
+  layer.addTo(map);
+  foodShopsLayer = layer;
+
+  const foodLegend = document.getElementById('food-legend');
+  foodLegend.innerHTML = '<div class="legend-item"><div style="width:10px;height:10px;background:#f39c12;border:2px solid #aaa;border-radius:2px;flex-shrink:0"></div>food shop</div>';
+  foodLegend.classList.add('visible');
+}
+
+async function loadFoodShops() {
+  if (foodShopsData) { renderFoodShops(foodShopsData); return; }
+  let text;
+  try {
+    const resp = await fetch('pyrenees_food_shops.csv');
+    if (!resp.ok) throw new Error('not found');
+    text = await resp.text();
+  } catch {
+    document.getElementById('status').textContent = 'pyrenees_food_shops.csv not found — run fetch_pyrenees_food.py first';
+    foodShopsOn = false;
+    document.getElementById('btn-food-shops').textContent = 'Food shops: OFF';
+    document.getElementById('btn-food-shops').classList.remove('on');
+    return;
+  }
+  foodShopsData = Papa.parse(text, { header: true, skipEmptyLines: true }).data;
+  renderFoodShops(foodShopsData);
+}
+
+document.getElementById('btn-food-shops').addEventListener('click', () => {
+  foodShopsOn = !foodShopsOn;
+  const btn = document.getElementById('btn-food-shops');
+  if (foodShopsOn) {
+    btn.textContent = 'Food shops: ON';
+    btn.classList.add('on');
+    loadFoodShops();
+  } else {
+    btn.textContent = 'Food shops: OFF';
+    btn.classList.remove('on');
+    if (foodShopsLayer) { map.removeLayer(foodShopsLayer); foodShopsLayer = null; }
+    document.getElementById('food-legend').classList.remove('visible');
+  }
 });
 </script>
 </body>
