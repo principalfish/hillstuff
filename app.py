@@ -68,5 +68,4 @@ def create_app(test_config: dict | None = None) -> Flask:
 if __name__ == '__main__':
     app = create_app()
     print(f'Database: {os.path.abspath(db.DATABASE)}')
-    db.sync_db()
     app.run(debug=True)

@@ -11,4 +11,9 @@ else
     source "$DIR/venv/bin/activate"
 fi
 
+if [ -n "$WALKS_DB_SYNC" ] && [ -f "$WALKS_DB_SYNC" ]; then
+    echo "Copying DB from sync path: $WALKS_DB_SYNC"
+    cp "$WALKS_DB_SYNC" walks.db
+fi
+
 python app.py
