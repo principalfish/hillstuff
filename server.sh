@@ -1,4 +1,5 @@
 #!/bin/bash
+source ~/.bashrc
 DIR="$(dirname "$0")"
 
 if [ ! -d "$DIR/venv" ]; then

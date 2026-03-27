@@ -46,7 +46,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     @app.after_request
     def sync_db_after_write(response):
         if request.method in ("POST", "PUT", "DELETE", "PATCH"):
-            db.sync_to_windows()
+            db.sync_db()
         return response
 
     from walks import bp as walks_bp
@@ -68,5 +68,5 @@ def create_app(test_config: dict | None = None) -> Flask:
 if __name__ == '__main__':
     app = create_app()
     print(f'Database: {os.path.abspath(db.DATABASE)}')
-    db.sync_to_windows()
+    db.sync_db()
     app.run(debug=True)
