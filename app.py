@@ -8,6 +8,7 @@ from walks import db
 import walks.models  # noqa: F401 — registers models with SQLAlchemy
 import hills.models  # noqa: F401 — registers hills models with SQLAlchemy
 import logs.models   # noqa: F401 — registers logs models with SQLAlchemy
+import gear.models   # noqa: F401 — registers gear models with SQLAlchemy
 
 
 def _ordinal(n: int) -> str:
@@ -57,6 +58,9 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     from logs import bp as logs_bp
     app.register_blueprint(logs_bp, url_prefix='/logs')
+
+    from gear import bp as gear_bp
+    app.register_blueprint(gear_bp, url_prefix='/gear')
 
     @app.route('/')
     def home() -> str:
