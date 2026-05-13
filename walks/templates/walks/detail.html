@@ -121,6 +121,7 @@
             <tr>
                 <th>#</th>
                 <th>Location</th>
+                {% if route.start_time %}<th>Time of Day</th>{% endif %}
                 <th>Dist (km)</th>
                 <th>Ascent (m)</th>
                 <th>Descent (m)</th>
@@ -129,7 +130,6 @@
                 <th>Cum Descent</th>
                 <th>Time</th>
                 <th>Cum Time</th>
-                {% if route.start_time %}<th>Time of Day</th>{% endif %}
                 <th>Override</th>
                 <th>Notes</th>
             </tr>
@@ -145,6 +145,7 @@
                     {% if is_sunrise %}<span class="solar-badge sunrise-badge" title="Sunrise during this leg">☀↑</span>{% endif %}
                     {% if is_sunset %}<span class="solar-badge sunset-badge" title="Sunset during this leg">☀↓</span>{% endif %}
                 </td>
+                {% if route.start_time %}<td>{{ format_time_of_day(leg.time_of_day) }}</td>{% endif %}
                 <td><input type="number" step="0.1" name="distance_{{ leg.id }}" value="{{ '%.1f' | format(leg.distance_km) }}" class="stat-input"></td>
                 <td><input type="number" step="1" name="ascent_{{ leg.id }}" value="{{ '%.0f' | format(leg.ascent_m) }}" class="stat-input stat-input-narrow"></td>
                 <td><input type="number" step="1" name="descent_{{ leg.id }}" value="{{ '%.0f' | format(leg.descent_m) }}" class="stat-input stat-input-narrow"></td>
@@ -153,7 +154,6 @@
                 <td>{{ '%.0f' | format(leg.cumulative_descent) }}</td>
                 <td>{{ format_time(leg.time) }}</td>
                 <td>{{ format_time(leg.cumulative_time) }}</td>
-                {% if route.start_time %}<td>{{ format_time_of_day(leg.time_of_day) }}</td>{% endif %}
                 <td class="override-cell">
                     <input type="number" step="0.1" name="override_{{ leg.id }}"
                            value="{{ leg.override if leg.override is not none else '' }}"
@@ -176,7 +176,6 @@
                 <td></td>
                 <td><strong>{{ format_time(totals.time) }}</strong></td>
                 <td></td>
-                {% if route.start_time %}<td></td>{% endif %}
                 <td></td>
                 <td></td>
             </tr>
