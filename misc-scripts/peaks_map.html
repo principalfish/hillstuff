@@ -44,7 +44,7 @@
       flex-wrap: wrap;
     }
     #food-legend.visible { display: flex; }
-    #csv-select {
+    #csv-select, #gpx-select {
       padding: 5px 8px;
       border-radius: 4px;
       border: 1px solid #444;
@@ -111,6 +111,7 @@
 
 <div id="toolbar">
   <select id="csv-select"><option value="">— select dataset —</option></select>
+  <select id="gpx-select"><option value="">— no track —</option></select>
   <span id="status"></span>
   <button id="btn-food-shops">Food shops: OFF</button>
   <button id="btn-clear-poly" disabled>Clear polygon</button>
@@ -353,16 +354,18 @@ const select = document.getElementById('csv-select');
 fetch('/api/csvs')
   .then(r => r.json())
   .then(csvs => {
-    csvs.forEach((name, i) => {
+    csvs.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name;
       select.appendChild(opt);
-      if (i === 0) {
-        select.value = name;
-        loadAndRender(name);
-      }
     });
+    const preferred = 'peaks_filtered_195m.csv';
+    const defaultName = csvs.includes(preferred) ? preferred : csvs[0];
+    if (defaultName) {
+      select.value = defaultName;
+      loadAndRender(defaultName);
+    }
     if (!csvs.length) {
       document.getElementById('status').textContent = 'No CSVs found in directory.';
     }
@@ -453,6 +456,51 @@ async function loadFoodShops() {
   foodShopsData = Papa.parse(text, { header: true, skipEmptyLines: true }).data;
   renderFoodShops(foodShopsData);
 }
+
+// ── GPX track overlay ──────────────────────────────────────────────────────
+
+const gpxSelect = document.getElementById('gpx-select');
+const gpxCache = {};
+let gpxLayer = null;
+
+fetch('/api/gpx')
+  .then(r => r.json())
+  .then(gpxs => {
+    gpxs.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      gpxSelect.appendChild(opt);
+    });
+  })
+  .catch(() => { /* serve.py not running — leave dropdown empty */ });
+
+function drawGpx(xmlText) {
+  const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  let pts = Array.from(doc.getElementsByTagName('trkpt'));
+  if (!pts.length) pts = Array.from(doc.getElementsByTagName('rtept'));
+  const coords = pts
+    .map(p => [parseFloat(p.getAttribute('lat')), parseFloat(p.getAttribute('lon'))])
+    .filter(([a, b]) => !isNaN(a) && !isNaN(b));
+  if (gpxLayer) { map.removeLayer(gpxLayer); gpxLayer = null; }
+  if (!coords.length) return;
+  gpxLayer = L.polyline(coords, { color: '#e040fb', weight: 3, opacity: 0.9 }).addTo(map);
+}
+
+function loadAndRenderGpx(name) {
+  if (gpxCache[name]) { drawGpx(gpxCache[name]); return; }
+  fetch(encodeURI(name))
+    .then(r => r.text())
+    .then(text => { gpxCache[name] = text; drawGpx(text); });
+}
+
+gpxSelect.addEventListener('change', function() {
+  if (!this.value) {
+    if (gpxLayer) { map.removeLayer(gpxLayer); gpxLayer = null; }
+    return;
+  }
+  loadAndRenderGpx(this.value);
+});
 
 document.getElementById('btn-food-shops').addEventListener('click', () => {
   foodShopsOn = !foodShopsOn;
