@@ -36,6 +36,22 @@
     }
     #btn-food-shops.on { background: #2a7; color: #fff; }
 
+    #height-filter {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      font-size: 0.82em;
+      color: #aaa;
+    }
+    #height-filter select {
+      padding: 5px 8px;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #333;
+      color: #eee;
+      min-width: 90px;
+    }
+
     #food-legend {
       display: none;
       gap: 8px;
@@ -114,6 +130,18 @@
   <select id="gpx-select"><option value="">— no track —</option></select>
   <span id="status"></span>
   <button id="btn-food-shops">Food shops: OFF</button>
+  <div id="height-filter">
+    <label for="min-h">Min height</label>
+    <select id="min-h">
+      <option value="0">0 m</option>
+      <option value="500">500 m</option>
+      <option value="1000">1000 m</option>
+      <option value="1500">1500 m</option>
+      <option value="2000">2000 m</option>
+      <option value="2500" selected>2500 m</option>
+      <option value="3000">3000 m</option>
+    </select>
+  </div>
   <button id="btn-clear-poly" disabled>Clear polygon</button>
   <button id="btn-download-poly" disabled>Download filtered CSV</button>
   <div id="food-legend"></div>
@@ -207,33 +235,15 @@ map.on(L.Draw.Event.EDITED, () => applyPolyFilter());
 
 function applyPolyFilter() {
   if (!drawnPoly) return;
-  const latlngs = drawnPoly.getLatLngs()[0];
-  const name = document.getElementById('csv-select').value;
-  const rows = datasets[name] || [];
-  filteredRows = rows.filter(p => {
-    const lat = parseFloat(p.lat), lon = parseFloat(p.lon);
-    return !isNaN(lat) && !isNaN(lon) && pointInPoly(lat, lon, latlngs);
-  });
-  document.getElementById('status').textContent =
-    `${filteredRows.length} of ${rows.length} peaks in polygon`;
-  document.getElementById('btn-clear-poly').disabled   = false;
-  document.getElementById('btn-download-poly').disabled = false;
-  // Highlight sidebar items inside polygon
-  document.querySelectorAll('.hill-item').forEach(li => {
-    const lat = parseFloat(li.dataset.lat), lon = parseFloat(li.dataset.lon);
-    li.style.opacity = (!isNaN(lat) && pointInPoly(lat, lon, latlngs)) ? '1' : '0.25';
-  });
+  document.getElementById('btn-clear-poly').disabled = false;
+  refreshStatusAndPolyFilter();
 }
 
 document.getElementById('btn-clear-poly').addEventListener('click', () => {
   if (drawnPoly) { polyLayer.removeLayer(drawnPoly); drawnPoly = null; }
-  filteredRows = null;
-  document.getElementById('btn-clear-poly').disabled   = true;
-  document.getElementById('btn-download-poly').disabled = true;
+  document.getElementById('btn-clear-poly').disabled = true;
   document.querySelectorAll('.hill-item').forEach(li => li.style.opacity = '1');
-  const name = document.getElementById('csv-select').value;
-  document.getElementById('status').textContent =
-    `${(datasets[name] || []).length} peaks`;
+  refreshStatusAndPolyFilter();
 });
 
 document.getElementById('btn-download-poly').addEventListener('click', () => {
@@ -249,6 +259,64 @@ document.getElementById('btn-download-poly').addEventListener('click', () => {
 const datasets = {};
 let currentLayer = null;
 let activeItem = null;
+let currentItems = [];   // [{ row, marker, li, ele, lat, lon }]
+
+function getMinHeight() {
+  const minH = parseFloat(document.getElementById('min-h').value) || 0;
+  return { minH, active: minH > 0 };
+}
+
+function passesHeight(ele, range) {
+  return ele >= range.minH;
+}
+
+function applyHeightFilter() {
+  const range = getMinHeight();
+  if (!currentLayer) return;
+  currentItems.forEach(it => {
+    const pass = passesHeight(it.ele, range);
+    if (pass) {
+      if (!currentLayer.hasLayer(it.marker)) currentLayer.addLayer(it.marker);
+      it.li.style.display = '';
+    } else {
+      if (currentLayer.hasLayer(it.marker)) currentLayer.removeLayer(it.marker);
+      it.li.style.display = 'none';
+    }
+  });
+  refreshStatusAndPolyFilter();
+}
+
+function refreshStatusAndPolyFilter() {
+  const range = getMinHeight();
+  const name = document.getElementById('csv-select').value;
+  const rows = datasets[name] || [];
+  const heightRows = rows.filter(p => passesHeight(parseFloat(p.elevation_m) || 0, range));
+
+  if (drawnPoly) {
+    const latlngs = drawnPoly.getLatLngs()[0];
+    filteredRows = heightRows.filter(p => {
+      const lat = parseFloat(p.lat), lon = parseFloat(p.lon);
+      return !isNaN(lat) && !isNaN(lon) && pointInPoly(lat, lon, latlngs);
+    });
+    document.getElementById('status').textContent =
+      `${filteredRows.length} of ${rows.length} peaks${range.active ? ' (height + polygon)' : ' in polygon'}`;
+    document.getElementById('btn-download-poly').disabled = false;
+    document.querySelectorAll('.hill-item').forEach(li => {
+      if (li.style.display === 'none') return;
+      const lat = parseFloat(li.dataset.lat), lon = parseFloat(li.dataset.lon);
+      li.style.opacity = (!isNaN(lat) && pointInPoly(lat, lon, latlngs)) ? '1' : '0.25';
+    });
+  } else {
+    filteredRows = range.active ? heightRows : null;
+    document.getElementById('btn-download-poly').disabled = !range.active;
+    if (range.active) {
+      document.getElementById('status').textContent =
+        `${heightRows.length} of ${rows.length} peaks in height range`;
+    } else {
+      document.getElementById('status').textContent = `${rows.length} peaks`;
+    }
+  }
+}
 
 function renderDataset(name) {
   if (currentLayer) map.removeLayer(currentLayer);
@@ -261,6 +329,7 @@ function renderDataset(name) {
   const layer = L.layerGroup();
   const sidebarList = document.getElementById('sidebar-list');
   sidebarList.innerHTML = '';
+  currentItems = [];
   let count = 0;
 
   rows.forEach(p => {
@@ -336,6 +405,7 @@ function renderDataset(name) {
     sidebarList.appendChild(li);
 
     layer.addLayer(marker);
+    currentItems.push({ row: p, marker, li, ele, lat, lon });
   });
 
   layer.addTo(map);
@@ -346,6 +416,8 @@ function renderDataset(name) {
     .map(p => [parseFloat(p.lat), parseFloat(p.lon)])
     .filter(([a, b]) => !isNaN(a) && !isNaN(b));
   if (coords.length) map.fitBounds(coords, { padding: [30, 30] });
+
+  applyHeightFilter();
 }
 
 // Populate dropdown from server
@@ -387,6 +459,8 @@ function loadAndRender(name) {
 select.addEventListener('change', function() {
   if (this.value) loadAndRender(this.value);
 });
+
+document.getElementById('min-h').addEventListener('change', applyHeightFilter);
 
 // ── Food shops overlay ─────────────────────────────────────────────────────
 
