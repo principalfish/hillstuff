@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}Goals {{ year }}{% endblock %}
+
+{% block head %}
+<style>
+    .year-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+    .year-tab {
+        display: inline-flex; align-items: center; gap: 0.3rem;
+        padding: 0.3rem 0.7rem; border: 1px solid #ccc; border-radius: 999px;
+        text-decoration: none; color: #2d5016; font-weight: 500; font-size: 0.85rem;
+        background: #fff;
+    }
+    .year-tab:hover { background: #f0f0f0; }
+    .year-tab.active { background: #2d5016; color: #fff; border-color: #2d5016; }
+    .year-tab.archived { color: #888; }
+    .year-tab .tag { font-size: 0.65rem; opacity: 0.8; }
+
+    .archived-banner {
+        background: #fef9e7; border: 1px solid #f0e0a0; border-radius: 4px;
+        padding: 0.6rem 1rem; margin-bottom: 1rem; font-size: 0.9rem; color: #7a6a1a;
+    }
+
+    .dates-strip {
+        background: #2d5016; color: #fff; border-radius: 6px;
+        padding: 0.75rem 1rem; margin-bottom: 1.5rem;
+        display: flex; gap: 2rem; flex-wrap: wrap; align-items: baseline;
+    }
+    .dates-strip .label { font-size: 0.8rem; opacity: 0.85; }
+    .dates-strip .value { font-size: 1.4rem; font-weight: 700; }
+
+    .badge {
+        display: inline-block; font-size: 0.7rem; padding: 0.05rem 0.4rem;
+        border-radius: 3px; background: #eef3e8; color: #2d5016; margin-right: 0.2rem;
+    }
+
+    .goal-fields { display: flex; flex-direction: column; gap: 0.5rem; min-width: 14rem; }
+    .goal-fields label { font-size: 0.8rem; font-weight: 500; display: flex; flex-direction: column; gap: 0.2rem; }
+    .goal-fields .activity-set { border: 1px solid #ddd; border-radius: 4px; padding: 0.3rem 0.5rem; }
+    .goal-fields .activity-set legend { font-size: 0.75rem; color: #666; padding: 0 0.3rem; }
+    .goal-fields .cb { flex-direction: row; align-items: center; gap: 0.3rem; }
+    .cb { display: inline-flex; align-items: center; gap: 0.3rem; }
+    .cb input[type="checkbox"] { width: auto; }
+
+    details.add-goal { margin: 0.75rem 0 1.5rem; }
+    details.add-goal > summary { display: inline-flex; width: auto; }
+    .goal-form { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 1rem; margin-top: 0.5rem; max-width: 18rem; }
+
+    .proj-tables { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .proj-tables table { width: auto; }
+    .proj-tables td, .proj-tables th { text-align: right; }
+    .proj-tables td:first-child, .proj-tables th:first-child { text-align: left; }
+
+    .totals-grid td input[type="number"] { width: 6rem; text-align: right; }
+    .totals-grid td:not(:first-child), .totals-grid th:not(:first-child) { text-align: right; }
+
+    .milestone-add { margin-top: 0.5rem; flex-wrap: wrap; }
+    .milestone-add input[type="text"] { width: auto; }
+
+    .ms-table input[type="text"] { width: 100%; min-width: 7rem; }
+    .ms-table input[type="checkbox"] { width: auto; }
+    .ms-actions { white-space: nowrap; }
+    .ms-actions .btn { margin-right: 0.2rem; }
+
+    main { padding-bottom: 4rem; }
+</style>
+{% endblock %}
+
+{% macro num(v, dp=1) %}{% if v is none %}—{% else %}{{ ('%.' ~ dp ~ 'f') | format(v) }}{% endif %}{% endmacro %}
+
+{% macro goal_fields(activity_rows, goal_type_options, name='', goal_type='', selected=[], target='') %}
+<div class="goal-fields">
+    <label>Name
+        <input type="text" name="name" value="{{ name }}" required maxlength="80">
+    </label>
+    <label>Metric
+        <select name="goal_type" required>
+            {% for val, label in goal_type_options %}
+            <option value="{{ val }}" {% if val == goal_type %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <fieldset class="activity-set">
+        <legend>Activities</legend>
+        {% for key, label in activity_rows %}
+        <label class="cb"><input type="checkbox" name="activity_types" value="{{ key }}"
+            {% if key in selected %}checked{% endif %}> {{ label }}</label>
+        {% endfor %}
+    </fieldset>
+    <label>Target
+        <input type="number" step="any" min="0" name="target" value="{{ target }}" required>
+    </label>
+</div>
+{% endmacro %}
+
+{% block content %}
+{% set editable = not gy.archived %}
+
+<div class="page-header">
+    <h1>Goals {{ year }}</h1>
+    <div class="header-actions">
+        {% if gy.archived %}
+        <form method="post" action="{{ url_for('goals.unarchive', year=year) }}" class="inline-form">
+            <button class="btn btn-small" type="submit">Unarchive</button>
+        </form>
+        {% else %}
+        <form method="post" action="{{ url_for('goals.archive', year=year) }}" class="inline-form"
+              onsubmit="return confirm('Archive {{ year }}? Its numbers will be frozen and made read-only.');">
+            <button class="btn btn-small btn-danger" type="submit">Archive year</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="year-tabs">
+    {% for y in years %}
+    <a href="{{ url_for('goals.year_view', year=y.year) }}"
+       class="year-tab {% if y.year == year %}active{% endif %} {% if y.archived %}archived{% endif %}">
+        {{ y.year }}{% if y.archived %}<span class="tag">archived</span>{% endif %}
+    </a>
+    {% endfor %}
+    <form method="post" action="{{ url_for('goals.new_year') }}" class="inline-form">
+        <button class="btn btn-small" type="submit">+ Start new year</button>
+    </form>
+</div>
+
+{% if gy.archived %}
+<div class="archived-banner">Archived &amp; frozen as of {{ gy.archived_on }}. Unarchive to make changes.</div>
+{% endif %}
+
+<div class="dates-strip">
+    <div><div class="label">Days elapsed</div><div class="value">{{ yp.days_elapsed }}</div></div>
+    <div><div class="label">Days remaining</div><div class="value">{{ yp.days_remaining }}</div></div>
+    <div><div class="label">Weeks elapsed</div><div class="value">{{ num(yp.weeks_elapsed) }}</div></div>
+    <div><div class="label">Weeks remaining</div><div class="value">{{ num(yp.weeks_remaining) }}</div></div>
+    <div><div class="label">As of</div><div class="value" style="font-size:1rem">{{ yp.as_of }}</div></div>
+</div>
+
+<h2>Aims</h2>
+<p class="help-text">Rows are shaded green when on track for the year, red when behind. Req/wk shows
+the rate needed from the year start vs. from today.</p>
+<table>
+    <thead>
+        <tr>
+            <th>Goal</th><th>Activities</th><th>Metric</th><th>Target</th><th>Done</th><th>%</th>
+            <th>Req/wk start</th><th>Req/wk now</th><th>Projected</th>{% if editable %}<th></th>{% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in goal_rows %}
+        <tr class="{% if row.status.on_track %}row-faster{% else %}row-slower{% endif %}">
+            <td>{{ row.goal.name }}</td>
+            <td>{% for at in row.activity_types %}<span class="badge">{{ at }}</span>{% endfor %}</td>
+            <td>{{ row.type_label }}</td>
+            <td>{{ num(row.goal.target, 0) }} {{ row.unit }}</td>
+            <td>{{ num(row.status.progress, 1) }} {{ row.unit }}</td>
+            <td>{{ num(row.status.pct, 0) }}%</td>
+            <td>{{ num(row.status.per_week_start, 1) }}</td>
+            <td>{{ num(row.status.per_week_now, 1) }}</td>
+            <td>{{ num(row.status.projected_year_end, 0) }} {{ row.unit }}</td>
+            {% if editable %}
+            <td class="col-actions">
+                <details class="inline-details">
+                    <summary class="btn btn-small">Edit</summary>
+                    <div class="actions-dropdown">
+                        <form method="post" action="{{ url_for('goals.goal_edit', year=year, goal_id=row.goal.id) }}">
+                            {{ goal_fields(activity_rows, goal_type_options, row.goal.name, row.goal.goal_type, row.activity_types, row.goal.target) }}
+                            <button class="btn btn-small btn-primary" type="submit" style="margin-top:0.5rem">Save</button>
+                        </form>
+                        <form method="post" action="{{ url_for('goals.goal_delete', year=year, goal_id=row.goal.id) }}"
+                              onsubmit="return confirm('Delete this goal?');">
+                            <button class="btn btn-small btn-danger" type="submit">Delete</button>
+                        </form>
+                    </div>
+                </details>
+            </td>
+            {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="{% if editable %}10{% else %}9{% endif %}" class="help-text">No goals yet.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if editable %}
+<details class="add-goal">
+    <summary class="btn btn-small btn-primary">+ Add goal</summary>
+    <form method="post" action="{{ url_for('goals.goal_new', year=year) }}" class="goal-form">
+        {{ goal_fields(activity_rows, goal_type_options) }}
+        <button class="btn btn-primary" type="submit" style="margin-top:0.5rem">Add goal</button>
+    </form>
+</details>
+{% endif %}
+
+<h2>Totals (current state)</h2>
+<p class="help-text">Your progress so far, entered by hand. The Total row sums all activities.</p>
+<form method="post" action="{{ url_for('goals.totals_update', year=year) }}">
+    <table class="totals-grid" style="width:auto">
+        <thead>
+            <tr><th></th>{% for m, label, unit, suffix in metric_cols %}<th>{{ label }} ({{ unit }})</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+            {% for at, label in activity_rows %}
+            <tr>
+                <td><strong>{{ label }}</strong></td>
+                {% for m, mlabel, unit, suffix in metric_cols %}
+                <td>
+                    {% if editable %}
+                    <input type="number" step="any" min="0" name="{{ at }}_{{ suffix }}" value="{{ grid[at][m] }}">
+                    {% else %}{{ num(grid[at][m]) }}{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="totals-row">
+                <td>Total</td>
+                {% for m, label, unit, suffix in metric_cols %}<td>{{ num(totals_sum[m]) }}</td>{% endfor %}
+            </tr>
+        </tfoot>
+    </table>
+    {% if editable %}<button class="btn btn-primary" type="submit" style="margin-top:0.5rem">Save totals</button>{% endif %}
+</form>
+
+<h2>Projections</h2>
+<p class="help-text">Extrapolated from your current totals and {{ yp.days_elapsed }} days elapsed.</p>
+<div class="proj-tables">
+    {% for title, key in [('Per day', 'day'), ('Per week', 'week'), ('Projected year', 'year')] %}
+    <table>
+        <thead>
+            <tr><th>{{ title }}</th>{% for m, label, unit, suffix in metric_cols %}<th>{{ label }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+            {% for at, label in activity_rows %}
+            <tr>
+                <td>{{ label }}</td>
+                {% for m, mlabel, unit, suffix in metric_cols %}<td>{{ num(projections[key][at][m]) }}</td>{% endfor %}
+            </tr>
+            {% endfor %}
+            <tr class="totals-row">
+                <td>Total</td>
+                {% for m, label, unit, suffix in metric_cols %}<td>{{ num(projections[key]['total'][m]) }}</td>{% endfor %}
+            </tr>
+        </tbody>
+    </table>
+    {% endfor %}
+</div>
+
+<h2>Milestones</h2>
+{% if editable %}
+{# Each row's inputs belong to these forms via the HTML5 form= attribute, so one
+   Save button commits the whole row. Delete stays a separate immediate action. #}
+{% for m in milestones %}
+<form id="ms-{{ m.id }}" method="post" action="{{ url_for('goals.milestone_edit', year=year, milestone_id=m.id) }}"></form>
+<form id="ms-del-{{ m.id }}" method="post" action="{{ url_for('goals.milestone_delete', year=year, milestone_id=m.id) }}"
+      onsubmit="return confirm('Delete milestone?');"></form>
+{% endfor %}
+{% endif %}
+<table class="ms-table" style="width:auto">
+    <thead>
+        <tr><th>Done</th><th>Milestone</th><th>Target</th><th>Result</th>{% if editable %}<th></th>{% endif %}</tr>
+    </thead>
+    <tbody>
+        {% for m in milestones %}
+        <tr class="{% if m.achieved %}row-faster{% endif %}">
+            <td class="col-owned">
+                {% if editable %}<input type="checkbox" form="ms-{{ m.id }}" name="achieved" value="1" {% if m.achieved %}checked{% endif %}>
+                {% else %}{% if m.achieved %}&#9989;{% else %}&#9744;{% endif %}{% endif %}
+            </td>
+            <td>{% if editable %}<input type="text" form="ms-{{ m.id }}" name="name" value="{{ m.name }}" required maxlength="120">{% else %}{{ m.name }}{% endif %}</td>
+            <td>{% if editable %}<input type="text" form="ms-{{ m.id }}" name="target" value="{{ m.target or '' }}" placeholder="target">{% else %}{{ m.target or '' }}{% endif %}</td>
+            <td>{% if editable %}<input type="text" form="ms-{{ m.id }}" name="result" value="{{ m.result or '' }}" placeholder="result">{% else %}{{ m.result or '' }}{% endif %}</td>
+            {% if editable %}
+            <td class="col-actions ms-actions">
+                <button class="btn btn-small btn-primary" form="ms-{{ m.id }}" type="submit">Save</button>
+                <button class="btn btn-small btn-danger" form="ms-del-{{ m.id }}" type="submit" title="Delete milestone">&times;</button>
+            </td>
+            {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="{% if editable %}5{% else %}4{% endif %}" class="help-text">No milestones yet.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if editable %}
+<form method="post" action="{{ url_for('goals.milestone_new', year=year) }}" class="inline-form milestone-add">
+    <input type="text" name="name" placeholder="Milestone (e.g. Ramsay Round)" required>
+    <input type="text" name="target" placeholder="target (e.g. 6h57)">
+    <label class="cb"><input type="checkbox" name="achieved" value="1"> done</label>
+    <button class="btn btn-small btn-primary" type="submit">+ Add</button>
+</form>
+{% endif %}
+{% endblock %}
