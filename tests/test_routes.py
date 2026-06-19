@@ -125,6 +125,32 @@ class TestEditRoute:
         r = client.get('/bigruns/9999/edit')
         assert r.status_code == 302
 
+    def test_edit_preserves_attempt_leg_times(self, client: FlaskClient, sample_route: int) -> None:
+        # Record an attempt with a time on each leg
+        legs = Leg.query.filter_by(route_id=sample_route).order_by(Leg.leg_num).all()
+        attempt_data = {'attempt_name': 'Past Run', 'attempt_date': '2024-05-05', 'attempt_notes': ''}
+        for i, leg in enumerate(legs):
+            attempt_data[f'attempt_time_{leg.id}'] = str((i + 1) * 10)
+        client.post(f'/bigruns/{sample_route}/attempts', data=attempt_data)
+        attempt = Attempt.query.filter_by(route_id=sample_route).first()
+        assert attempt is not None
+
+        # Re-save the route (changing leg metadata) — leg ids must survive so the
+        # attempt's per-leg times still map to the route's legs
+        client.post(f'/bigruns/{sample_route}/edit', data={
+            'name': 'Mamores', 'latitude': '56.8', 'longitude': '-5.1',
+            'leg_location_0': 'Lower Falls', 'leg_distance_0': '0', 'leg_ascent_0': '0', 'leg_descent_0': '0', 'leg_notes_0': '',
+            'leg_location_1': 'River', 'leg_distance_1': '9.0', 'leg_ascent_1': '400', 'leg_descent_1': '82', 'leg_notes_1': '',
+            'leg_location_2': 'Binnein Beag', 'leg_distance_2': '2.1', 'leg_ascent_2': '637', 'leg_descent_2': '3', 'leg_notes_2': 'steep',
+        })
+
+        current_leg_ids = {l.id for l in Leg.query.filter_by(route_id=sample_route).all()}
+        a_legs = AttemptLeg.query.filter_by(attempt_id=attempt.id).all()
+        assert len(a_legs) == len(legs)
+        # No orphans: every attempt leg still points at a current leg, times intact
+        assert all(al.leg_id in current_leg_ids for al in a_legs)
+        assert sorted(al.actual_time_minutes for al in a_legs) == [10.0, 20.0, 30.0]
+
 
 # --- Delete Route ---
 

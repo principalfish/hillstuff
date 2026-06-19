@@ -31,9 +31,10 @@ def solar_times(lat: float, lon: float, date_str: str) -> SolarResult | None:
     lat_rad = math.radians(lat)
     dec_rad = math.radians(declination)
 
-    # Hour angle for sunrise/sunset (accounting for atmospheric refraction)
+    # Hour angle for sunrise/sunset. -0.833° is the sun's standard altitude at
+    # sunrise/sunset (atmospheric refraction + solar semi-diameter).
     cos_ha = (
-        -math.sin(math.radians(-0.833)) - math.sin(lat_rad) * math.sin(dec_rad)
+        math.sin(math.radians(-0.833)) - math.sin(lat_rad) * math.sin(dec_rad)
     ) / (math.cos(lat_rad) * math.cos(dec_rad))
 
     if cos_ha > 1:

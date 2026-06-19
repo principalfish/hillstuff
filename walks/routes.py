@@ -120,6 +120,16 @@ def _save_route(route_id: int | None) -> WerkzeugResponse:
                 ascent_pace=asc,
                 descent_pace=desc,
             ))
+        for leg in legs:
+            db.session.add(Leg(
+                route_id=route_id,
+                leg_num=leg.leg_num,
+                location=leg.location,
+                distance_km=leg.distance_km,
+                ascent_m=leg.ascent_m,
+                descent_m=leg.descent_m,
+                notes=leg.notes,
+            ))
     else:
         existing = db.session.get(Route, route_id)
         assert existing is not None
@@ -127,23 +137,40 @@ def _save_route(route_id: int | None) -> WerkzeugResponse:
         route.name = form.name
         route.latitude = form.latitude
         route.longitude = form.longitude
-        Leg.query.filter_by(route_id=route_id).delete()
-        TimeOverride.query.filter_by(route_id=route_id).delete()
-
-    for leg in legs:
-        db.session.add(Leg(
-            route_id=route_id,
-            leg_num=leg.leg_num,
-            location=leg.location,
-            distance_km=leg.distance_km,
-            ascent_m=leg.ascent_m,
-            descent_m=leg.descent_m,
-            notes=leg.notes,
-        ))
+        _update_legs(route_id, legs)
 
     db.session.commit()
     flash('Route saved.', 'success')
     return redirect(url_for('walks.route_detail', route_id=route_id))
+
+
+def _update_legs(route_id: int, legs: list[LegForm]) -> None:
+    """Update an existing route's legs in place, keyed by leg_num.
+
+    Reusing leg ids (rather than deleting and recreating) keeps the
+    attempt_legs and time_overrides that reference each leg valid across an
+    edit — recreating legs assigns new ids and orphans those rows. Legs beyond
+    the new leg count are removed, along with their dependent rows (SQLite does
+    not enforce ON DELETE CASCADE unless foreign_keys is enabled)."""
+    existing = {l.leg_num: l for l in Leg.query.filter_by(route_id=route_id).all()}
+    seen: set[int] = set()
+    for lf in legs:
+        leg = existing.get(lf.leg_num)
+        if leg is None:
+            leg = Leg(route_id=route_id, leg_num=lf.leg_num)
+            db.session.add(leg)
+        leg.location = lf.location
+        leg.distance_km = lf.distance_km
+        leg.ascent_m = lf.ascent_m
+        leg.descent_m = lf.descent_m
+        leg.notes = lf.notes
+        seen.add(lf.leg_num)
+
+    for leg_num, leg in existing.items():
+        if leg_num not in seen:
+            TimeOverride.query.filter_by(leg_id=leg.id).delete()
+            AttemptLeg.query.filter_by(leg_id=leg.id).delete()
+            db.session.delete(leg)
 
 
 def _parse_legs(req: WerkzeugRequest) -> list[LegForm] | None:

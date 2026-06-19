@@ -134,6 +134,27 @@ def test_find_solar_events_no_solar() -> None:
     assert result['sunset_leg'] is None
 
 
+def test_find_solar_events_overnight_run() -> None:
+    # ~23.5h run starting 06:00; sunrise (04:27) and the previous evening's
+    # sunset (22:17) both fall during the run, on different days.
+    legs = [
+        {'leg_num': 1, 'time': 0},
+        {'leg_num': 2, 'time': 16 * 60},    # ends 22:00 day 1 — before sunset
+        {'leg_num': 3, 'time': 6 * 60},     # ends 04:00 day 2 — crosses sunset
+        {'leg_num': 4, 'time': 90},         # ends 05:30 day 2 — crosses sunrise
+    ]
+    solar = {
+        'sunrise': 4.45, 'sunset': 22.28,
+        'solar_noon': 13.37, 'daylight_hours': 17.84,
+        'sunrise_str': '04:27', 'sunset_str': '22:17',
+        'solar_noon_str': '13:22', 'daylight_str': '17:50',
+        'timezone': 'BST',
+    }
+    result = find_solar_events(legs, 360, solar)  # start 06:00
+    assert result['sunset_leg'] == 3   # 22:17 on day 1, during leg 3
+    assert result['sunrise_leg'] == 4  # 04:27 next morning, during leg 4
+
+
 # --- format_time ---
 
 def test_format_time_hours() -> None:

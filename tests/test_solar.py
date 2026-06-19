@@ -8,9 +8,11 @@ def test_solar_times_summer() -> None:
     result = solar_times(56.8, -5.1, '2026-06-21')
     assert result is not None
     assert result['timezone'] == 'BST'
-    assert 3.0 < result['sunrise'] < 6.0
-    assert 20.0 < result['sunset'] < 23.0
-    assert result['daylight_hours'] > 16
+    # Fort William, summer solstice: sunrise ~04:27, sunset ~22:17 BST.
+    # The -0.833° refraction term must lengthen the day, not shorten it.
+    assert 4.3 < result['sunrise'] < 4.6
+    assert 22.1 < result['sunset'] < 22.5
+    assert result['daylight_hours'] > 17.5
 
 
 def test_solar_times_winter() -> None:

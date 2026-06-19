@@ -94,6 +94,25 @@ def calculate_leg_times(
     return results
 
 
+def _solar_event_in_window(
+    event_min: float, leg_start: float, leg_end: float
+) -> float | None:
+    """Return the absolute time (minutes from the run's start-day midnight) at
+    which a daily solar event falls within [leg_start, leg_end], or None.
+
+    event_min is a time of day (0-1440); leg_start/leg_end are absolute minutes
+    elapsed from the start day's midnight, which grow past 1440 on overnight
+    runs. Checking successive days lets the next morning's sunrise match.
+    """
+    k = 0
+    while event_min + 1440 * k <= leg_end:
+        absolute = event_min + 1440 * k
+        if absolute >= leg_start:
+            return absolute
+        k += 1
+    return None
+
+
 def find_solar_events(
     legs: list[LegDict],
     start_time_minutes: float,
@@ -121,13 +140,17 @@ def find_solar_events(
         cum_time += leg['time']
         leg_end_tod = start_time_minutes + cum_time
 
-        if result['sunrise_leg'] is None and leg_start_tod <= sunrise_min <= leg_end_tod:
-            result['sunrise_leg'] = leg['leg_num']
-            result['sunrise_cum_time'] = sunrise_min - start_time_minutes
+        if result['sunrise_leg'] is None:
+            hit = _solar_event_in_window(sunrise_min, leg_start_tod, leg_end_tod)
+            if hit is not None:
+                result['sunrise_leg'] = leg['leg_num']
+                result['sunrise_cum_time'] = hit - start_time_minutes
 
-        if result['sunset_leg'] is None and leg_start_tod <= sunset_min <= leg_end_tod:
-            result['sunset_leg'] = leg['leg_num']
-            result['sunset_cum_time'] = sunset_min - start_time_minutes
+        if result['sunset_leg'] is None:
+            hit = _solar_event_in_window(sunset_min, leg_start_tod, leg_end_tod)
+            if hit is not None:
+                result['sunset_leg'] = leg['leg_num']
+                result['sunset_cum_time'] = hit - start_time_minutes
 
     return result
 
