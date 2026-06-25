@@ -9,5 +9,5 @@ walks - Copy.db
 
 old_data/*
 
-misc-scripts/dem_cache/*
-misc-scripts/dem_cache_kgz/*
+# DEM tile caches — auto-named dem_cache_<bbox>/ by scripts/calc_prominence.py
+misc-scripts/dem_cache*/

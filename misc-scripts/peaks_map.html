@@ -132,14 +132,10 @@
   <button id="btn-food-shops">Food shops: OFF</button>
   <div id="height-filter">
     <label for="min-h">Min height</label>
+    <!-- Options are rebuilt per-dataset by updateHeightOptions(); this seeds the
+         default selection (preserved on load when the dataset reaches it). -->
     <select id="min-h">
-      <option value="0">0 m</option>
-      <option value="500">500 m</option>
-      <option value="1000">1000 m</option>
-      <option value="1500">1500 m</option>
-      <option value="2000">2000 m</option>
       <option value="2500" selected>2500 m</option>
-      <option value="3000">3000 m</option>
     </select>
   </div>
   <button id="btn-clear-poly" disabled>Clear polygon</button>
@@ -191,6 +187,24 @@ function updateBands(rows) {
 function colorForEle(ele) {
   const e = parseFloat(ele) || 0;
   return (BANDS.find(b => e < b.max) || BANDS.at(-1) || { color: '#888' }).color;
+}
+
+// Rebuild the min-height dropdown for the current dataset: 0, 500, …, up to the
+// highest 500 m mark that still has peaks. Preserves the current selection if it
+// remains in range, otherwise resets to "0 m".
+function updateHeightOptions(rows) {
+  const sel = document.getElementById('min-h');
+  const prev = sel.value;
+  const elevs = rows.map(p => parseFloat(p.elevation_m)).filter(e => !isNaN(e));
+  const maxE = elevs.reduce((a, b) => Math.max(a, b), 0);
+  const top  = Math.floor(maxE / 500) * 500;
+
+  let html = '<option value="0">0 m</option>';
+  for (let h = 500; h <= top; h += 500) {
+    html += `<option value="${h}">${h} m</option>`;
+  }
+  sel.innerHTML = html;
+  sel.value = [...sel.options].some(o => o.value === prev) ? prev : '0';
 }
 
 // Map
@@ -326,6 +340,7 @@ function renderDataset(name) {
   if (!rows.length) return;
 
   updateBands(rows);
+  updateHeightOptions(rows);
   const layer = L.layerGroup();
   const sidebarList = document.getElementById('sidebar-list');
   sidebarList.innerHTML = '';
@@ -429,10 +444,10 @@ fetch('/api/csvs')
     csvs.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
-      opt.textContent = name;
+      opt.textContent = name.replace(/^csv\//, '');
       select.appendChild(opt);
     });
-    const preferred = 'peaks_filtered_195m.csv';
+    const preferred = 'csv/peaks_filtered_195m.csv';
     const defaultName = csvs.includes(preferred) ? preferred : csvs[0];
     if (defaultName) {
       select.value = defaultName;
@@ -517,11 +532,11 @@ async function loadFoodShops() {
   if (foodShopsData) { renderFoodShops(foodShopsData); return; }
   let text;
   try {
-    const resp = await fetch('pyrenees_food_shops.csv');
+    const resp = await fetch('csv/pyrenees_food_shops.csv');
     if (!resp.ok) throw new Error('not found');
     text = await resp.text();
   } catch {
-    document.getElementById('status').textContent = 'pyrenees_food_shops.csv not found — run fetch_pyrenees_food.py first';
+    document.getElementById('status').textContent = 'csv/pyrenees_food_shops.csv not found';
     foodShopsOn = false;
     document.getElementById('btn-food-shops').textContent = 'Food shops: OFF';
     document.getElementById('btn-food-shops').classList.remove('on');
@@ -543,7 +558,7 @@ fetch('/api/gpx')
     gpxs.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
-      opt.textContent = name;
+      opt.textContent = name.replace(/^gpx\//, '');
       gpxSelect.appendChild(opt);
     });
   })

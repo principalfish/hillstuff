@@ -20,7 +20,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path == "/api/csvs":
             csvs = sorted(
-                os.path.basename(f) for f in glob.glob(os.path.join(SCRIPT_DIR, "*.csv"))
+                "csv/" + os.path.basename(f)
+                for f in glob.glob(os.path.join(SCRIPT_DIR, "csv", "*.csv"))
                 if os.path.basename(f) != "pyrenees_food_shops.csv"
             )
             body = json.dumps(csvs).encode()
@@ -31,7 +32,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
         elif self.path == "/api/gpx":
             gpx = sorted(
-                os.path.basename(f) for f in glob.glob(os.path.join(SCRIPT_DIR, "*.gpx"))
+                "gpx/" + os.path.basename(f)
+                for f in glob.glob(os.path.join(SCRIPT_DIR, "gpx", "*.gpx"))
             )
             body = json.dumps(gpx).encode()
             self.send_response(200)

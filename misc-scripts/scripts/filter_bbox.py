@@ -19,7 +19,7 @@ if len(args) < 4:
     sys.exit(__doc__)
 
 lat_min, lat_max, lon_min, lon_max = (float(a) for a in args[:4])
-input_path  = Path(args[4]) if len(args) > 4 else SCRIPT_DIR / "merged_pyrenees_prom_195.csv"
+input_path  = Path(args[4]) if len(args) > 4 else SCRIPT_DIR.parent / "csv" / "merged_pyrenees_prom_195.csv"
 output_path = Path(args[5]) if len(args) > 5 else input_path.with_stem(input_path.stem + "_bbox")
 
 rows = list(csv.DictReader(open(input_path, encoding="utf-8")))

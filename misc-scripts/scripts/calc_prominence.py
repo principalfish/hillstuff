@@ -1,21 +1,49 @@
 """
-calc_prominence_kyrgyzstan.py — Compute topographic prominence for Kyrgyzstan peaks.
+calc_prominence.py — Compute topographic prominence for peaks in a bounding box.
 
 Uses Copernicus GLO-30 (~30m) DEM tiles from the public AWS S3 bucket and a
-cell-sort union-find algorithm to find the key col for each peak.
+cell-sort union-find algorithm to find the key col (highest saddle to higher
+terrain) for each peak.
 
 Usage:
     pip install numpy requests rasterio
-    python calc_prominence_kyrgyzstan.py [input.csv [output.csv]]
+    python scripts/calc_prominence.py --input csv/<region>_peaks.csv [options]
 
-Tiles are downloaded automatically to dem_cache_kgz/ and cached.
+By default the DEM tile bbox is derived from the input CSV's peak extent
+(floored/ceiled to whole tiles, plus --pad degrees). Pass --bbox to set it
+explicitly — e.g. to constrain the extent and limit download/RAM.
 
-Bbox: eastern Kyrgyzstan (lat 39-43, lon 74-81) = 28 tiles, ~363M cells.
-Peak RAM ~9GB. Covers all Tian Shan including Khan Tengri and Pobeda.
-Excludes western ranges (Fergana/Chatkal) and northern steppe.
+Examples:
+    # Pyrenees — bbox auto-derived from the peaks
+    python scripts/calc_prominence.py \\
+        --input csv/pyrenees_peaks.csv \\
+        --output csv/pyrenees_prom.csv
+
+    # Eastern Kyrgyzstan — explicit bbox, trim to >= 200 m
+    python scripts/calc_prominence.py \\
+        --bbox 39,74,43,81 \\
+        --input csv/kyrgyzstan_peaks.csv \\
+        --output csv/kyrgyzstan_prom.csv \\
+        --min-prominence 200
+
+    # Western Kyrgyzstan — auto bbox with a little padding
+    python scripts/calc_prominence.py \\
+        --input csv/kyrgyzstan_peaks_west.csv \\
+        --output csv/kyrgyzstan_prom_west.csv \\
+        --pad 0.5 --min-prominence 200
+
+Tiles are downloaded automatically and cached in
+misc-scripts/dem_cache_<lat_min>_<lon_min>_<lat_max>_<lon_max>/ by default.
+Use --cache-dir to override.
+
+Bbox note: tile bounds are INTEGER degrees — one Copernicus tile per lat/lon
+degree. When deriving, a peak's key col may fall just outside a tight extent
+(reported as no prominence / unbounded); raise --pad to extend the box.
 """
 
+import argparse
 import csv
+import math
 import sys
 import time
 from pathlib import Path
@@ -28,23 +56,8 @@ try:
 except ImportError:
     sys.exit("rasterio required:  pip install rasterio")
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-
 SCRIPT_DIR = Path(__file__).parent
-CACHE_DIR  = SCRIPT_DIR / "dem_cache_kgz"
-INPUT_CSV  = SCRIPT_DIR / "kyrgyzstan_peaks.csv"
-OUTPUT_CSV = SCRIPT_DIR / "kyrgyzstan_prom.csv"
 
-# Bounding box: eastern Kyrgyzstan — Bishkek area east to Chinese border.
-# Drops the western ranges (Fergana/Chatkal, lon 69-74) and northern steppe
-# (lat 43-44). Keeps all Tian Shan including Khan Tengri and Pobeda.
-# 28 tiles, ~363M cells, ~9GB peak RAM (vs 60 tiles / 18GB for full extent).
-LAT_MIN, LAT_MAX = 39, 43   # exclusive upper bound  (4 rows)
-LON_MIN, LON_MAX = 74, 81   # exclusive upper bound  (7 cols)
-
-# Copernicus GLO-30 public tiles on AWS (no auth required).
 COP_BASE = "https://copernicus-dem-30m.s3.amazonaws.com"
 NODATA   = -32768
 
@@ -54,7 +67,7 @@ NODATA   = -32768
 # ---------------------------------------------------------------------------
 
 def cop_tile_key(lat: int, lon: int) -> str:
-    """Copernicus tile stem (used as both directory name and .tif filename)."""
+    """Copernicus tile stem (directory name and .tif filename)."""
     ns = f"N{lat:02d}"      if lat >= 0 else f"S{abs(lat):02d}"
     ew = f"E{abs(lon):03d}" if lon >= 0 else f"W{abs(lon):03d}"
     return f"Copernicus_DSM_COG_10_{ns}_00_{ew}_00_DEM"
@@ -69,13 +82,17 @@ def cop_tile_url(lat: int, lon: int) -> str:
 # Download
 # ---------------------------------------------------------------------------
 
-def download_tiles(cache_dir: Path) -> None:
-    """Download individual Copernicus COG tiles for the bounding box."""
+def download_tiles(
+    cache_dir: Path,
+    lat_min: int, lat_max: int,
+    lon_min: int, lon_max: int,
+) -> None:
+    """Download Copernicus COG tiles for the bounding box."""
     cache_dir.mkdir(exist_ok=True)
-    total = (LAT_MAX - LAT_MIN) * (LON_MAX - LON_MIN)
+    total = (lat_max - lat_min) * (lon_max - lon_min)
     done = 0
-    for lat in range(LAT_MIN, LAT_MAX):
-        for lon in range(LON_MIN, LON_MAX):
+    for lat in range(lat_min, lat_max):
+        for lon in range(lon_min, lon_max):
             done += 1
             out = cache_dir / f"{cop_tile_key(lat, lon)}.tif"
             if out.exists():
@@ -103,7 +120,7 @@ def download_tiles(cache_dir: Path) -> None:
 def load_tif(path: Path) -> np.ndarray:
     """Read a Copernicus COG tile as int16, replacing nodata with NODATA."""
     with rasterio.open(path) as ds:
-        data     = ds.read(1).astype(np.float32)
+        data = ds.read(1).astype(np.float32)
         nd_value = ds.nodata
     if nd_value is not None:
         data[data == nd_value] = NODATA
@@ -111,17 +128,24 @@ def load_tif(path: Path) -> np.ndarray:
     return data.astype(np.int16)
 
 
-def load_dem(cache_dir: Path) -> tuple[np.ndarray, tuple[float, float, float]]:
+def load_dem(
+    cache_dir: Path,
+    lat_min: int, lat_max: int,
+    lon_min: int, lon_max: int,
+) -> tuple[np.ndarray, tuple[float, float, float]]:
     """
     Stitch Copernicus tiles into a single array.
+
+    Copernicus tiles have shared edges removed, so each tile slots in cleanly
+    with no deduplication.
 
     Returns:
         dem           int16 array, shape (nrows, ncols)
         geotransform  (north_lat, west_lon, cell_deg)
     """
     tile_h = tile_w = 0
-    for lat in range(LAT_MIN, LAT_MAX):
-        for lon in range(LON_MIN, LON_MAX):
+    for lat in range(lat_min, lat_max):
+        for lon in range(lon_min, lon_max):
             p = cache_dir / f"{cop_tile_key(lat, lon)}.tif"
             if p.exists():
                 with rasterio.open(p) as ds:
@@ -133,8 +157,8 @@ def load_dem(cache_dir: Path) -> tuple[np.ndarray, tuple[float, float, float]]:
         sys.exit("No tiles found in cache — run download first.")
 
     cell_deg = 1.0 / tile_h
-    n_lat    = LAT_MAX - LAT_MIN
-    n_lon    = LON_MAX - LON_MIN
+    n_lat    = lat_max - lat_min
+    n_lon    = lon_max - lon_min
     nrows    = n_lat * tile_h
     ncols    = n_lon * tile_w
 
@@ -142,23 +166,25 @@ def load_dem(cache_dir: Path) -> tuple[np.ndarray, tuple[float, float, float]]:
           f"({nrows*ncols*2/1e9:.1f} GB int16)…")
     dem = np.full((nrows, ncols), NODATA, dtype=np.int16)
 
-    for lat in range(LAT_MIN, LAT_MAX):
-        for lon in range(LON_MIN, LON_MAX):
+    for lat in range(lat_min, lat_max):
+        for lon in range(lon_min, lon_max):
             tpath = cache_dir / f"{cop_tile_key(lat, lon)}.tif"
             if not tpath.exists():
                 print(f"  WARNING: {tpath.name} not found — leaving NODATA")
                 continue
             tile = load_tif(tpath)
-            row0 = (LAT_MAX - 1 - lat) * tile_h
-            col0 = (lon - LON_MIN) * tile_w
+            row0 = (lat_max - 1 - lat) * tile_h
+            col0 = (lon - lon_min) * tile_w
             dem[row0:row0 + tile_h, col0:col0 + tile_w] = tile
 
-    gt = (float(LAT_MAX), float(LON_MIN), cell_deg)
+    gt = (float(lat_max), float(lon_min), cell_deg)
     return dem, gt
 
 
-def latlon_to_rc(lat: float, lon: float,
-                 gt: tuple[float, float, float]) -> tuple[int, int]:
+def latlon_to_rc(
+    lat: float, lon: float,
+    gt: tuple[float, float, float],
+) -> tuple[int, int]:
     north, west, cell = gt
     return round((north - lat) / cell), round((lon - west) / cell)
 
@@ -169,10 +195,10 @@ def latlon_to_rc(lat: float, lon: float,
 
 def compute_prominence(
     dem: np.ndarray,
-    peaks: list[tuple[int, int, int, float]],
+    peaks: list[tuple[int, int, int, float]],  # (idx, row, col, elev)
 ) -> dict[int, int]:
     """
-    Cell-sort prominence algorithm.
+    Cell-sort prominence algorithm (memory-efficient alternative to Kruskal).
 
     Sort all DEM cells by elevation descending, then process each cell by
     unioning it with any already-processed neighbours.  When two components
@@ -190,6 +216,7 @@ def compute_prominence(
     flat = dem.ravel().astype(np.int32)
     flat[flat == NODATA] = -32767
 
+    # argsort returns int64; cast to int32 immediately to halve memory
     sorted_idx   = np.argsort(flat)[::-1]
     sorted_cells = sorted_idx.astype(np.int32)
     del sorted_idx
@@ -209,7 +236,7 @@ def compute_prominence(
 
     def find(i: int) -> int:
         while parent.item(i) != i:
-            parent[i] = parent.item(parent.item(i))
+            parent[i] = parent.item(parent.item(i))   # path halving
             i = parent.item(i)
         return i
 
@@ -258,7 +285,7 @@ def compute_prominence(
 
 
 # ---------------------------------------------------------------------------
-# Main
+# CSV helpers
 # ---------------------------------------------------------------------------
 
 def load_rows(path: Path) -> list[dict]:
@@ -266,35 +293,153 @@ def load_rows(path: Path) -> list[dict]:
         return list(csv.DictReader(fh))
 
 
-def _in_bbox(row: dict) -> bool:
+def _in_bbox(
+    row: dict,
+    lat_min: int, lat_max: int,
+    lon_min: int, lon_max: int,
+) -> bool:
     try:
         lat = float(row["lat"])
         lon = float(row["lon"])
     except (ValueError, KeyError):
         return False
-    return LAT_MIN <= lat <= LAT_MAX and LON_MIN <= lon <= LON_MAX
+    return lat_min <= lat <= lat_max and lon_min <= lon <= lon_max
 
+
+def derive_bbox(rows: list[dict], pad: float) -> tuple[int, int, int, int]:
+    """
+    Derive integer tile bounds covering all peaks in the CSV, plus `pad` degrees.
+
+    Floors the south/west and ceils the north/east so the returned bounds line up
+    with whole Copernicus tiles. Returns (lat_min, lon_min, lat_max, lon_max).
+    """
+    lats, lons = [], []
+    for r in rows:
+        try:
+            lats.append(float(r["lat"]))
+            lons.append(float(r["lon"]))
+        except (ValueError, KeyError):
+            continue
+    if not lats:
+        sys.exit("Cannot derive --bbox: no valid lat/lon found in input CSV.")
+
+    lat_min = math.floor(min(lats) - pad)
+    lat_max = math.ceil(max(lats) + pad)
+    lon_min = math.floor(min(lons) - pad)
+    lon_max = math.ceil(max(lons) + pad)
+
+    # Upper bounds are exclusive in the tile range; guarantee at least one tile.
+    lat_max = max(lat_max, lat_min + 1)
+    lon_max = max(lon_max, lon_min + 1)
+    return lat_min, lon_min, lat_max, lon_max
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main() -> None:
-    args = sys.argv[1:]
-    input_path  = Path(args[0]) if args       else INPUT_CSV
-    output_path = Path(args[1]) if len(args) > 1 else OUTPUT_CSV
+    parser = argparse.ArgumentParser(
+        description="Compute topographic prominence using Copernicus GLO-30 DEM tiles.",
+    )
+    parser.add_argument(
+        "--bbox",
+        default=None,
+        metavar="LAT_MIN,LON_MIN,LAT_MAX,LON_MAX",
+        help=(
+            "Integer degree tile bounds, e.g. 42,-2,44,4. "
+            "Optional — if omitted, derived from the input CSV's peak extent "
+            "(floor/ceil to whole tiles) plus --pad. Pass this to constrain the "
+            "extent (e.g. to limit download/RAM)."
+        ),
+    )
+    parser.add_argument(
+        "--pad",
+        type=float,
+        default=0.0,
+        metavar="DEG",
+        help=(
+            "Degrees of padding added around the input extent when --bbox is "
+            "derived (default 0). Increase if peaks sit near a tile edge and "
+            "their key col may fall just outside."
+        ),
+    )
+    parser.add_argument(
+        "--input",
+        default=None,
+        metavar="FILE",
+        help="Input peaks CSV (default: csv/peaks.csv relative to misc-scripts/)",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        metavar="FILE",
+        help="Output CSV path (default: input path with _prom suffix)",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        default=None,
+        metavar="DIR",
+        help="DEM tile cache directory (default: misc-scripts/dem_cache_<bbox>/)",
+    )
+    parser.add_argument(
+        "--min-prominence",
+        type=int,
+        default=0,
+        metavar="M",
+        help=(
+            "If > 0, trim output to peaks with computed prominence >= M "
+            "(peaks with no key col found — effectively unbounded — are kept). "
+            "Default 0 = no trimming."
+        ),
+    )
+    args = parser.parse_args()
 
-    # 1. Load peaks and filter to bbox
+    # Input / output paths
+    input_path = Path(args.input) if args.input else SCRIPT_DIR.parent / "csv" / "peaks.csv"
+    if args.output:
+        output_path = Path(args.output)
+    else:
+        output_path = input_path.with_stem(input_path.stem + "_prom")
+
+    # 1. Load peaks
     print(f"Loading peaks from {input_path}…")
     rows = load_rows(input_path)
-    before = len(rows)
-    rows = [r for r in rows if _in_bbox(r)]
-    print(f"  {before} rows → {len(rows)} within bbox "
-          f"(lat {LAT_MIN}–{LAT_MAX}, lon {LON_MIN}–{LON_MAX})")
+    print(f"  {len(rows)} rows")
+
+    # Resolve the tile bbox: explicit --bbox, or derived from the peak extent.
+    if args.bbox:
+        try:
+            lat_min, lon_min, lat_max, lon_max = (int(x) for x in args.bbox.split(","))
+        except ValueError:
+            parser.error("--bbox must be four comma-separated integers: LAT_MIN,LON_MIN,LAT_MAX,LON_MAX")
+        before = len(rows)
+        rows = [r for r in rows if _in_bbox(r, lat_min, lat_max, lon_min, lon_max)]
+        print(f"  {before} → {len(rows)} rows within --bbox "
+              f"(lat {lat_min}–{lat_max}, lon {lon_min}–{lon_max})")
+    else:
+        lat_min, lon_min, lat_max, lon_max = derive_bbox(rows, args.pad)
+        print(f"  Derived bbox from peak extent (pad {args.pad}°): "
+              f"lat {lat_min}–{lat_max}, lon {lon_min}–{lon_max}")
+
+    # Cache dir (named from the resolved bbox)
+    cache_dir = (
+        Path(args.cache_dir)
+        if args.cache_dir
+        else SCRIPT_DIR.parent / f"dem_cache_{lat_min}_{lon_min}_{lat_max}_{lon_max}"
+    )
+
+    tile_count = (lat_max - lat_min) * (lon_max - lon_min)
+    cell_count  = tile_count * 3601 * 3601  # approximate
+    print(f"Tiles: {tile_count}  (~{cell_count//1_000_000}M cells)")
 
     # 2. Download DEM tiles
-    print(f"Downloading DEM tiles (lat {LAT_MIN}-{LAT_MAX}, lon {LON_MIN}-{LON_MAX})…")
-    download_tiles(CACHE_DIR)
+    print(f"Downloading DEM tiles to {cache_dir}…")
+    download_tiles(cache_dir, lat_min, lat_max, lon_min, lon_max)
 
     # 3. Stitch DEM
     print("Loading DEM…")
-    dem, gt = load_dem(CACHE_DIR)
+    dem, gt = load_dem(cache_dir, lat_min, lat_max, lon_min, lon_max)
     nrows, ncols = dem.shape
     print(f"  {nrows}×{ncols} = {nrows*ncols:,} cells  "
           f"({gt[0]}°N to {gt[0]-(nrows-1)*gt[2]:.1f}°N, "
@@ -342,7 +487,7 @@ def main() -> None:
         ps = f"{prom}m" if prom is not None else "n/a"
         print(f"  {name:<38} {elev:>6.0f}m  {ps:>8}  {orig:>8}")
 
-    # 7. Write output
+    # 7. Annotate rows with computed prominence
     fieldnames = list(rows[0].keys()) if rows else []
     if "prominence_calc" not in fieldnames:
         fieldnames.append("prominence_calc")
@@ -353,6 +498,23 @@ def main() -> None:
         rows[peak_idx]["prominence_calc"] = (
             int(round(elev - kc)) if kc is not None else ""
         )
+
+    # 8. Optionally trim to peaks with computed prominence >= min_prominence.
+    #    A blank prominence_calc means the peak is the high point of its area
+    #    (no key col found within the bbox — effectively unbounded) or it
+    #    couldn't be mapped to the DEM. Keep those; only drop peaks we can
+    #    positively show are below the threshold.
+    if args.min_prominence > 0:
+        def _prom_ok(row: dict) -> bool:
+            val = row.get("prominence_calc", "")
+            if val == "" or val is None:
+                return True
+            return int(val) >= args.min_prominence
+
+        before_trim = len(rows)
+        rows = [r for r in rows if _prom_ok(r)]
+        print(f"  Trimmed {before_trim} → {len(rows)} rows "
+              f"(prominence_calc ≥ {args.min_prominence}m, plus unbounded/unmapped)")
 
     with open(output_path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fieldnames, extrasaction="ignore")
