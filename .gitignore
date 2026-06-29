@@ -11,3 +11,6 @@ old_data/*
 
 # DEM tile caches — auto-named dem_cache_<bbox>/ by scripts/calc_prominence.py
 misc-scripts/dem_cache*/
+
+# Windows/WSL "mark of the web" metadata files
+*Zone.Identifier
