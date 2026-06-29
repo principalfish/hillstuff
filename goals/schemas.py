@@ -1,6 +1,7 @@
+import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from goals.calc import GOAL_TYPES
 from goals.models import ACTIVITY_TYPES
@@ -58,3 +59,15 @@ class ActivityTotalUpdate(BaseModel):
     distance_km: float = Field(ge=0)
     ascent_m: float = Field(ge=0)
     time_hours: float = Field(ge=0)
+
+
+class GoalPeriodForm(BaseModel):
+    """One active date range for a goal. Dates parsed from ISO form strings."""
+    start: datetime.date
+    end: datetime.date
+
+    @model_validator(mode='after')
+    def end_after_start(self) -> 'GoalPeriodForm':
+        if self.end < self.start:
+            raise ValueError('period end must be on or after its start')
+        return self

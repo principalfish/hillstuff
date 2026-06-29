@@ -55,6 +55,26 @@ class Goal(db.Model):
     target = db.Column(db.Float, nullable=False)
     sort_order = db.Column(db.Integer, nullable=False, default=0)
 
+    # Active date ranges the target is pursued in. No periods = the whole year;
+    # otherwise pacing reckons only against days inside these ranges (e.g. to
+    # exclude a long break away).
+    periods = db.relationship('GoalPeriod', backref='goal',
+                              cascade='all, delete-orphan',
+                              order_by='GoalPeriod.start_date, GoalPeriod.id')
+
+
+class GoalPeriod(db.Model):
+    """An active date range for a goal (inclusive). Multiple per goal; days
+    outside every period are excluded from the goal's pacing maths."""
+    __tablename__ = 'goal_periods'
+
+    id = db.Column(db.Integer, primary_key=True)
+    goal_id = db.Column(db.Integer,
+                        db.ForeignKey('goal_targets.id', ondelete='CASCADE'),
+                        nullable=False)
+    start_date = db.Column(db.Text, nullable=False)  # ISO YYYY-MM-DD, inclusive
+    end_date = db.Column(db.Text, nullable=False)    # ISO YYYY-MM-DD, inclusive
+
 
 class Milestone(db.Model):
     """A named event / effort with a done-or-not marker."""

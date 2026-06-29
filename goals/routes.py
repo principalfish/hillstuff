@@ -5,8 +5,8 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response as WerkzeugResponse
 
 from goals import bp, calc
-from goals.models import GoalYear, ActivityTotal, Goal, Milestone, ACTIVITY_TYPES
-from goals.schemas import GoalCreate, MilestoneCreate, ActivityTotalUpdate
+from goals.models import GoalYear, ActivityTotal, Goal, GoalPeriod, Milestone, ACTIVITY_TYPES
+from goals.schemas import GoalCreate, GoalPeriodForm, MilestoneCreate, ActivityTotalUpdate
 from walks.db import db
 
 # (key, label) pairs in display order for the grid rows and projection rows.
@@ -48,7 +48,9 @@ def _reference_date(gy: GoalYear) -> datetime.date:
 
 def _flash_errors(e: ValidationError) -> None:
     for err in e.errors():
-        flash(f'{err["loc"][-1]}: {err["msg"]}', 'error')
+        loc = err["loc"]
+        field = loc[-1] if loc else 'value'  # model-level errors have an empty loc
+        flash(f'{field}: {err["msg"]}', 'error')
 
 
 def _load_active(year: int) -> GoalYear | WerkzeugResponse:
@@ -105,12 +107,18 @@ def year_view(year: int) -> WerkzeugResponse | str:
     for g in gy.goals:
         ats = g.activity_types.split(',') if g.activity_types else []
         progress = calc.goal_progress(g.goal_type, ats, grid)
+        period_pairs = [(p.start_date, p.end_date) for p in g.periods]
+        total = elapsed = None
+        if period_pairs:
+            total, elapsed = calc.active_day_counts(year, period_pairs, ref)
         goal_rows.append({
             'goal': g,
             'activity_types': ats,
             'type_label': calc.GOAL_TYPE_LABELS.get(g.goal_type, g.goal_type),
             'unit': calc.GOAL_TYPE_UNITS.get(g.goal_type, ''),
-            'status': calc.goal_status(g.target, progress, yp),
+            'periods': period_pairs,
+            'active_days': total,
+            'status': calc.goal_status(g.target, progress, yp, total, elapsed),
         })
 
     # Day / week / year-end projections per activity (+ total).
@@ -187,6 +195,28 @@ def _goal_form() -> GoalCreate:
     })
 
 
+def _goal_periods() -> list[GoalPeriodForm]:
+    """Parse the repeatable date-range rows into validated periods.
+
+    Fully-blank rows are skipped; a half-filled or malformed row raises
+    ValidationError so it surfaces to the user.
+    """
+    starts = request.form.getlist('period_start')
+    ends = request.form.getlist('period_end')
+    periods = []
+    for start, end in zip(starts, ends):
+        start, end = start.strip(), end.strip()
+        if not start and not end:
+            continue
+        periods.append(GoalPeriodForm.model_validate({'start': start, 'end': end}))
+    return periods
+
+
+def _period_rows(periods: list[GoalPeriodForm]) -> list[GoalPeriod]:
+    return [GoalPeriod(start_date=p.start.isoformat(), end_date=p.end.isoformat())
+            for p in periods]
+
+
 @bp.route('/<int:year>/goals', methods=['POST'])
 def goal_new(year: int) -> WerkzeugResponse:
     gy = _load_active(year)
@@ -194,6 +224,7 @@ def goal_new(year: int) -> WerkzeugResponse:
         return gy
     try:
         form = _goal_form()
+        periods = _goal_periods()
     except ValidationError as e:
         _flash_errors(e)
         return redirect(url_for('goals.year_view', year=year))
@@ -206,6 +237,7 @@ def goal_new(year: int) -> WerkzeugResponse:
         activity_types=','.join(form.activity_types),
         target=form.target,
         sort_order=next_order,
+        periods=_period_rows(periods),
     ))
     db.session.commit()
     flash('Goal added.', 'success')
@@ -223,6 +255,7 @@ def goal_edit(year: int, goal_id: int) -> WerkzeugResponse:
         return redirect(url_for('goals.year_view', year=year))
     try:
         form = _goal_form()
+        periods = _goal_periods()
     except ValidationError as e:
         _flash_errors(e)
         return redirect(url_for('goals.year_view', year=year))
@@ -231,6 +264,7 @@ def goal_edit(year: int, goal_id: int) -> WerkzeugResponse:
     goal.goal_type = form.goal_type
     goal.activity_types = ','.join(form.activity_types)
     goal.target = form.target
+    goal.periods = _period_rows(periods)  # type: ignore[assignment]  # replaces rows (delete-orphan)
     db.session.commit()
     flash('Goal updated.', 'success')
     return redirect(url_for('goals.year_view', year=year))

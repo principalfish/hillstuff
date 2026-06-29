@@ -42,6 +42,12 @@
     .cb { display: inline-flex; align-items: center; gap: 0.3rem; }
     .cb input[type="checkbox"] { width: auto; }
 
+    .period-set { border: 1px solid #ddd; border-radius: 4px; padding: 0.3rem 0.5rem; }
+    .period-set legend { font-size: 0.75rem; color: #666; padding: 0 0.3rem; }
+    .period-row { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.3rem; }
+    .period-row input[type="date"] { width: auto; }
+    .period-row span { font-size: 0.75rem; color: #666; }
+
     details.add-goal { margin: 0.75rem 0 1.5rem; }
     details.add-goal > summary { display: inline-flex; width: auto; }
     .goal-form { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 1rem; margin-top: 0.5rem; max-width: 18rem; }
@@ -68,7 +74,7 @@
 
 {% macro num(v, dp=1) %}{% if v is none %}—{% else %}{{ ('%.' ~ dp ~ 'f') | format(v) }}{% endif %}{% endmacro %}
 
-{% macro goal_fields(activity_rows, goal_type_options, name='', goal_type='', selected=[], target='') %}
+{% macro goal_fields(activity_rows, goal_type_options, name='', goal_type='', selected=[], target='', periods=[]) %}
 <div class="goal-fields">
     <label>Name
         <input type="text" name="name" value="{{ name }}" required maxlength="80">
@@ -90,6 +96,22 @@
     <label>Target
         <input type="number" step="any" min="0" name="target" value="{{ target }}" required>
     </label>
+    <fieldset class="period-set">
+        <legend>Active periods</legend>
+        <p class="help-text" style="margin:0 0 0.3rem">Leave empty for the whole year. Add ranges to
+            pace only across the dates you're training (e.g. excluding time away).</p>
+        <div class="period-rows">
+            {% for start, end in periods %}
+            <div class="period-row">
+                <input type="date" name="period_start" value="{{ start }}">
+                <span>to</span>
+                <input type="date" name="period_end" value="{{ end }}">
+                <button type="button" class="btn btn-small btn-danger remove-period" title="Remove range">&times;</button>
+            </div>
+            {% endfor %}
+        </div>
+        <button type="button" class="btn btn-small add-period">+ Add range</button>
+    </fieldset>
 </div>
 {% endmacro %}
 
@@ -137,8 +159,9 @@
 </div>
 
 <h2>Aims</h2>
-<p class="help-text">Rows are shaded green when on track for the year, red when behind. Req/wk shows
-the rate needed from the year start vs. from today.</p>
+<p class="help-text">Rows are shaded green when on track, red when behind. Req/wk shows the rate
+needed from the start vs. from today. Goals with active periods pace only against the days inside
+those ranges, so time away doesn't count against you.</p>
 <table>
     <thead>
         <tr>
@@ -149,7 +172,8 @@ the rate needed from the year start vs. from today.</p>
     <tbody>
         {% for row in goal_rows %}
         <tr class="{% if row.status.on_track %}row-faster{% else %}row-slower{% endif %}">
-            <td>{{ row.goal.name }}</td>
+            <td>{{ row.goal.name }}{% if row.periods %}
+                <span class="badge" title="{% for s, e in row.periods %}{{ s | friendly_date }} – {{ e | friendly_date }}{% if not loop.last %}, {% endif %}{% endfor %}">{{ row.active_days }} active days</span>{% endif %}</td>
             <td>{% for at in row.activity_types %}<span class="badge">{{ at }}</span>{% endfor %}</td>
             <td>{{ row.type_label }}</td>
             <td>{{ num(row.goal.target, 0) }} {{ row.unit }}</td>
@@ -164,7 +188,7 @@ the rate needed from the year start vs. from today.</p>
                     <summary class="btn btn-small">Edit</summary>
                     <div class="actions-dropdown">
                         <form method="post" action="{{ url_for('goals.goal_edit', year=year, goal_id=row.goal.id) }}">
-                            {{ goal_fields(activity_rows, goal_type_options, row.goal.name, row.goal.goal_type, row.activity_types, row.goal.target) }}
+                            {{ goal_fields(activity_rows, goal_type_options, row.goal.name, row.goal.goal_type, row.activity_types, row.goal.target, row.periods) }}
                             <button class="btn btn-small btn-primary" type="submit" style="margin-top:0.5rem">Save</button>
                         </form>
                         <form method="post" action="{{ url_for('goals.goal_delete', year=year, goal_id=row.goal.id) }}"
@@ -291,4 +315,8 @@ the rate needed from the year start vs. from today.</p>
     <button class="btn btn-small btn-primary" type="submit">+ Add</button>
 </form>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('goals.static', filename='goals/goals.js') }}"></script>
 {% endblock %}

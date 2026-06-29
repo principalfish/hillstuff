@@ -97,6 +97,57 @@ class TestGoals:
         assert g.target == 3220
         assert g.activity_types == 'run,walk'
 
+    def test_periods_stored_and_blank_rows_skipped(self, client: FlaskClient) -> None:
+        _setup_year(client)
+        client.post(f'/goals/{YEAR}/goals', data={
+            'name': 'Split year', 'goal_type': 'distance',
+            'activity_types': ['run'], 'target': '500',
+            'period_start': ['2026-01-01', '2026-09-21', ''],
+            'period_end': ['2026-07-04', '2026-12-31', ''],
+        })
+        g = Goal.query.filter_by(name='Split year').first()
+        assert g is not None
+        pairs = sorted((p.start_date, p.end_date) for p in g.periods)
+        assert pairs == [('2026-01-01', '2026-07-04'), ('2026-09-21', '2026-12-31')]
+
+    def test_no_periods_means_whole_year(self, client: FlaskClient) -> None:
+        _setup_year(client)
+        client.post(f'/goals/{YEAR}/goals', data={
+            'name': 'Year run', 'goal_type': 'distance',
+            'activity_types': ['run'], 'target': '3000',
+        })
+        g = Goal.query.filter_by(name='Year run').first()
+        assert g is not None
+        assert list(g.periods) == []
+
+    def test_reversed_period_rejected(self, client: FlaskClient) -> None:
+        _setup_year(client)
+        client.post(f'/goals/{YEAR}/goals', data={
+            'name': 'Bad', 'goal_type': 'distance', 'activity_types': ['run'], 'target': '10',
+            'period_start': ['2026-07-04'], 'period_end': ['2026-01-01'],
+        })
+        assert Goal.query.count() == 0
+
+    def test_edit_replaces_periods(self, client: FlaskClient) -> None:
+        _setup_year(client)
+        client.post(f'/goals/{YEAR}/goals', data={
+            'name': 'Run dist', 'goal_type': 'distance',
+            'activity_types': ['run'], 'target': '3000',
+            'period_start': ['2026-01-01'], 'period_end': ['2026-06-30'],
+        })
+        g = Goal.query.first()
+        assert g is not None
+        gid = g.id
+        client.post(f'/goals/{YEAR}/goals/{gid}/edit', data={
+            'name': 'Run dist', 'goal_type': 'distance',
+            'activity_types': ['run'], 'target': '3000',
+            'period_start': [''], 'period_end': [''],
+        })
+        db.session.expire_all()
+        g2 = db.session.get(Goal, gid)
+        assert g2 is not None
+        assert list(g2.periods) == []  # cleared
+
     def test_delete_goal(self, client: FlaskClient) -> None:
         _setup_year(client)
         client.post(f'/goals/{YEAR}/goals', data={

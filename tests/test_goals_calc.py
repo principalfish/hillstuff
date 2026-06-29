@@ -71,6 +71,77 @@ class TestGoalStatus:
         assert st.per_week_now is None
 
 
+class TestActiveDayCounts:
+    """Counting active days across a goal's date ranges."""
+
+    def test_single_range(self) -> None:
+        total, elapsed = calc.active_day_counts(
+            2026, [('2026-01-01', '2026-01-10')], datetime.date(2026, 1, 5))
+        assert total == 10              # inclusive of both ends
+        assert elapsed == 5            # Jan 1..5 on or before ref
+
+    def test_two_ranges_with_gap(self) -> None:
+        # The user's case: away mid-year. Active 1 Jan–4 Jul and 21 Sep–31 Dec.
+        periods = [('2026-01-01', '2026-07-04'), ('2026-09-21', '2026-12-31')]
+        total, elapsed = calc.active_day_counts(2026, periods, REF)  # ref 4 Jun
+        first = (datetime.date(2026, 7, 4) - datetime.date(2026, 1, 1)).days + 1
+        second = (datetime.date(2026, 12, 31) - datetime.date(2026, 9, 21)).days + 1
+        assert total == first + second
+        # ref 4 Jun is inside the first range -> all of Jan 1..Jun 4 elapsed.
+        assert elapsed == (REF - datetime.date(2026, 1, 1)).days + 1
+
+    def test_overlapping_ranges_deduped(self) -> None:
+        total, _ = calc.active_day_counts(
+            2026, [('2026-01-01', '2026-01-10'), ('2026-01-05', '2026-01-15')],
+            datetime.date(2026, 1, 1))
+        assert total == 15            # Jan 1..15, not 25
+
+    def test_clamped_to_year_and_bad_ranges_skipped(self) -> None:
+        periods = [('2025-12-20', '2026-01-05'),   # clamps to Jan 1..5
+                   ('2026-03-10', '2026-03-01'),   # reversed -> skipped
+                   ('garbage', '2026-04-01')]      # unparseable -> skipped
+        total, _ = calc.active_day_counts(2026, periods, datetime.date(2026, 12, 31))
+        assert total == 5
+
+    def test_ref_in_gap_counts_only_pre_gap_as_elapsed(self) -> None:
+        periods = [('2026-01-01', '2026-03-31'), ('2026-09-01', '2026-12-31')]
+        _, elapsed = calc.active_day_counts(2026, periods, datetime.date(2026, 7, 1))
+        assert elapsed == (datetime.date(2026, 3, 31) - datetime.date(2026, 1, 1)).days + 1
+
+
+class TestGoalStatusWindow:
+    """goal_status with an explicit active-day window (total + elapsed)."""
+
+    def test_window_shrinks_per_week_start(self) -> None:
+        yp = calc.year_progress(2026, REF)
+        st = calc.goal_status(100, 0, yp, window_total=90, window_elapsed=30)
+        assert round(st.per_week_start, 4) == round(100 * 7 / 90, 4)
+
+    def test_none_window_equals_full_year(self) -> None:
+        yp = calc.year_progress(2026, REF)
+        default = calc.goal_status(3220, 1325.5, yp)
+        explicit = calc.goal_status(3220, 1325.5, yp,
+                                    window_total=yp.days_in_year,
+                                    window_elapsed=yp.days_elapsed)
+        assert default.per_week_start == explicit.per_week_start
+        assert default.per_week_now == explicit.per_week_now
+        assert default.projected_year_end == explicit.projected_year_end
+        assert default.on_track == explicit.on_track
+
+    def test_rates_use_active_window(self) -> None:
+        yp = calc.year_progress(2026, REF)
+        st = calc.goal_status(100, 20, yp, window_total=90, window_elapsed=30)
+        assert round(st.per_week_now, 4) == round((100 - 20) / ((90 - 30) / 7), 4)
+        assert round(st.projected_year_end, 4) == round(20 / 30 * 90, 4)
+        # expected 100*30/90 = 33.3 > 20 -> behind.
+        assert st.on_track is False
+
+    def test_no_active_days_remaining(self) -> None:
+        yp = calc.year_progress(2026, REF)
+        st = calc.goal_status(100, 50, yp, window_total=90, window_elapsed=90)
+        assert st.per_week_now is None
+
+
 class TestExtrapolate:
     def test_run_distance(self) -> None:
         yp = calc.year_progress(2026, REF)

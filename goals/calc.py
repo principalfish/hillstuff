@@ -74,16 +74,49 @@ class GoalStatus:
     projected_year_end: float | None
 
 
-def goal_status(target: float, progress: float, yp: YearProgress) -> GoalStatus:
-    diy = yp.days_in_year
-    elapsed = yp.days_elapsed
+def active_day_counts(year: int, periods: Iterable[tuple[str, str]],
+                      ref: datetime.date) -> tuple[int, int]:
+    """Count active days across `periods`, clamped to `year` and de-duplicated.
+
+    `periods` is an iterable of (start_iso, end_iso) inclusive ranges. Returns
+    (total_active_days, elapsed_active_days) where elapsed counts active days on
+    or before `ref`. Invalid or reversed ranges are skipped.
+    """
+    year_start = datetime.date(year, 1, 1)
+    year_end = datetime.date(year, 12, 31)
+    days: set[int] = set()
+    for start_iso, end_iso in periods:
+        try:
+            start = datetime.date.fromisoformat(start_iso)
+            end = datetime.date.fromisoformat(end_iso)
+        except (ValueError, TypeError):
+            continue
+        if end < start:
+            continue
+        start = max(start, year_start)
+        end = min(end, year_end)
+        days.update(range(start.toordinal(), end.toordinal() + 1))
+    ref_ord = ref.toordinal()
+    elapsed = sum(1 for o in days if o <= ref_ord)
+    return len(days), elapsed
+
+
+def goal_status(target: float, progress: float, yp: YearProgress,
+                window_total: int | None = None,
+                window_elapsed: int | None = None) -> GoalStatus:
+    # Default window is the whole year. A goal with active periods passes its
+    # active-day total/elapsed so pacing ignores days outside those periods.
+    total = window_total if window_total is not None else yp.days_in_year
+    elapsed = window_elapsed if window_elapsed is not None else yp.days_elapsed
+    remaining = max(total - elapsed, 0)
+    weeks_remaining = remaining / 7
     pct = (progress / target * 100) if target else None
-    expected = (target * elapsed / diy) if diy else None
+    expected = (target * elapsed / total) if total else None
     on_track = progress >= expected if expected is not None else True
-    per_week_start = (target * 7 / diy) if diy else None
-    per_week_now = (max(target - progress, 0.0) / yp.weeks_remaining
-                    if yp.weeks_remaining > 0 else None)
-    projected = (progress / elapsed * diy) if elapsed > 0 else None
+    per_week_start = (target * 7 / total) if total else None
+    per_week_now = (max(target - progress, 0.0) / weeks_remaining
+                    if weeks_remaining > 0 else None)
+    projected = (progress / elapsed * total) if elapsed > 0 else None
     return GoalStatus(
         progress=progress,
         target=target,
